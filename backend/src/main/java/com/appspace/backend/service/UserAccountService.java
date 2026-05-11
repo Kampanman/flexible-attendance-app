@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;  // ←インポートをお忘れなく
 
 @Service
 @RequiredArgsConstructor  // これをつけることで、repository を自動的に繋いでくれる（依存性の注入）コードが生成される
@@ -53,5 +54,12 @@ public class UserAccountService {
     public Optional<UserAccount> authenticate(String userId, String rawPassword) {
         return repository.findByUserId(userId)
                 .filter(user -> passwordEncoder.matches(rawPassword, user.getPassword()));
+    }
+
+    /**
+     * 全ユーザーの一覧を取得する（デバッグ用）
+     */
+    public List<UserAccount> findAll() {
+        return repository.findAll();
     }
 }

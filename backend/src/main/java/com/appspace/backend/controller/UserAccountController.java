@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;  // ←インポートをお忘れなく
+
 @RestController  // 「画面（HTML）」ではなく「データ（JSON）」を返す窓口であることを示す（htmlの場合は@Controller）
 @RequestMapping("/api/users")  // コントローラーが扱うURLの共通ルート
 @RequiredArgsConstructor
@@ -47,5 +49,14 @@ public class UserAccountController {
                     return ResponseEntity.ok(user);
                 })
                 .orElse(ResponseEntity.status(401).build()); // 認証失敗時は 401 Unauthorized
+    }
+
+    /**
+     * データベースの中身を確認するために 「一時的な確認用API」
+     * POST http://localhost:8080/api/users/debug-list
+     */
+    @GetMapping("/debug-list")
+    public List<UserAccount> debugList() {
+        return userService.findAll(); // findAll()メソッドをServiceに作る必要があります
     }
 }

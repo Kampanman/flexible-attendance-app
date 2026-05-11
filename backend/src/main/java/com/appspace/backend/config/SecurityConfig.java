@@ -17,11 +17,19 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // テスト用なのでCSRF保護を無効化
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/h2-console/**") // CSRF対策をH2Consoleだけ無効化（これがないとログインボタンが効かない）
+                .disable() 
+            )
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin()) // H2 Consoleは内部でFramesetを使っているため、その表示を許可する
+            )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/users/register", "/api/users/login", "/api/attendance/**").permitAll() // /attendance/** で配下をすべて許可
+                .requestMatchers("/h2-console/**").permitAll() // H2 Consoleへのアクセスをすべての人に許可
+                .requestMatchers("/api/users/register", "/api/users/login", "/api/users/debug-list", "/api/attendance/**").permitAll()
                 .anyRequest().authenticated()
             );
+
         return http.build();
     }
 }
