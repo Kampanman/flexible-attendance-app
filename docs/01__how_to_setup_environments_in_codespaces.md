@@ -4,9 +4,10 @@ style: |
   section.frontpage {
     text-align: center;
   }
-  section li {
-    line-height: 1.2;
+  section p, section li {
+    font-size: 24px;
   }
+
 theme: default
 ---
 <!-- _class: frontpage -->
@@ -23,7 +24,8 @@ theme: default
 
 ### リポジトリの準備と起動
 
-1. **GitHub上で新しいリポジトリを作成** します（今回は名前を `flexible-attendance-app` としている）。
+1. **GitHub上で新しいリポジトリを作成** します。
+（今回は名前を `flexible-attendance-app` としている）。
 2. 「Code」ボタンをクリックし、「Codespaces」タブから **「Create codespace on main」** を選択して起動します。
 
 ---
@@ -120,7 +122,7 @@ Spring Bootには「Spring Initializr」という便利な雛形作成ツール�
 
 #### 拡張機能の確認
 
-まず、コマンドを有効にするために「Spring Boot拡張機能」がインストールされている必要があります。
+コマンドを有効にするために「Spring Boot拡張機能」がインストールされている必要があります。
 
 - 画面左側の「Extensions（四角いアイコン）」をクリックし、検索欄に **「Spring Boot Extension Pack」** と入力してください。
 - インストールされていなければ「Install」をクリックします。
@@ -227,7 +229,7 @@ spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.ser
 
 `Started BackendApplication in X.XXX seconds (process running for X.XXX)`
 
---- 
+---
 
 ### ポートの開放（GitHub Codespaces 特有の操作）
 

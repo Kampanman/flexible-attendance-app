@@ -51,7 +51,7 @@ public class AttendanceController {
      */
     @GetMapping("/history")
     public ResponseEntity<java.util.List<AttendanceRecord>> getHistory(@RequestParam String accountId) {
-        java.util.List<AttendanceRecord> history = attendanceService.getAllRecords(accountId);
+        java.util.List<AttendanceRecord> history = attendanceService.getHistory(accountId); 
         return ResponseEntity.ok(history);
     }
 

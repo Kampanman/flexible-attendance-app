@@ -24,22 +24,24 @@ const userId = ref('');
 const password = ref('');
 const errorMessage = ref('');
 
+// LoginForm.vue の handleLogin メソッド内
 const handleLogin = async () => {
   try {
-    // curlで叩いていたAPIをここで呼び出す
     const response = await apiClient.post('/users/login', {
       userId: userId.value,
       password: password.value
     });
     
-    console.log('ログイン成功:', response.data);
-    alert(`ようこそ、${response.data.userName}さん！`);
-    // 本来はここで打刻画面へ遷移させますが、まずは疎通確認まで
+    // alertは消して、親コンポーネントにイベントを送る
+    emit('login-success', response.data); 
   } catch (error) {
     console.error('ログイン失敗:', error);
     errorMessage.value = 'ユーザーIDまたはパスワードが正しくありません。';
   }
 };
+
+// script setup の冒頭に emit の定義を追加
+const emit = defineEmits(['login-success']);
 </script>
 
 <style scoped>

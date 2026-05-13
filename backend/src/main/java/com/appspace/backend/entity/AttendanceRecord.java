@@ -3,6 +3,7 @@ package com.appspace.backend.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import jakarta.persistence.PrePersist;
 
 @Entity
 @Table(name = "apply_attendance_records")
@@ -23,4 +24,11 @@ public class AttendanceRecord {
     private String status; // 例: "出勤中", "退勤済み"
 
     private String memo;
+
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

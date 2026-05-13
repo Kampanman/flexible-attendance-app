@@ -7,7 +7,7 @@ style : |
   section.frontpage h1 {
     text-align: center;
   }
-  section.frontpage h2 {
+  section.frontpage p {
     margin-top: 2em;
   }
 ---
@@ -17,11 +17,11 @@ style : |
 ここからの実装は、先にバックエンドに関するものを一通り仕上げておき、そのうえでフロントエンドの実装に移るのが望ましいでしょう。
 こうしておけば、フロントエンドの実装時に「動かないのは画面のせいか、サーバーのせいか？」と迷わずに済みます。
 
+---
+
 ## 打刻履歴の取得API の実装
 
 このAPIは、「誰が」「いつ」打刻したかというリストを、新しい順（降順）で取得するためのものです。
-
----
 
 ### AttendanceRecordRepository.java への追記
 

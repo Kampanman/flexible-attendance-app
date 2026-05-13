@@ -5,6 +5,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -17,19 +21,37 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf
-                .ignoringRequestMatchers("/h2-console/**") // CSRF対策をH2Consoleだけ無効化（これがないとログインボタンが効かない）
-                .disable() 
-            )
-            .headers(headers -> headers
-                .frameOptions(frame -> frame.sameOrigin()) // H2 Consoleは内部でFramesetを使っているため、その表示を許可する
-            )
+            // CORS設定を有効化
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/h2-console/**").permitAll() // H2 Consoleへのアクセスをすべての人に許可
-                .requestMatchers("/api/users/register", "/api/users/login", "/api/users/debug-list", "/api/attendance/**").permitAll()
+                .requestMatchers("/h2-console/**", "/api/users/**", "/api/attendance/**").permitAll()
                 .anyRequest().authenticated()
             );
-
         return http.build();
+    }
+
+    // CORSの具体的な許可ルールを定義するメソッド
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // フロントエンドのURLを許可（ワイルドカード "*" を使うか、正確なURLを指定します）
+        // Codespaces環境では "*" を指定するのが最も確実です
+        configuration.setAllowedOriginPatterns(Arrays.asList("*")); 
+        
+        // 許可するメソッド（GET, POSTなど）
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        
+        // 許可するヘッダー
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        
+        // クッキーなどの認証情報を許可するか（今回はfalseでOK）
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration); // 全パスに適用
+        return source;
     }
 }

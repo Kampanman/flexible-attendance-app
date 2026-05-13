@@ -14,6 +14,9 @@ style: |
         font-size: 20px;
         line-height: 1.2;
     }
+    section.line_height_1-5 pre {
+        line-height: 1.5;
+    }
 ---
 <!-- _class: frontpage -->
 
@@ -47,7 +50,7 @@ style: |
 ```
 
 ---
-
+<!-- _class: line_height_1-5 -->
 ## 追加ファイル
 
 ここからは、「apply_attendance_records」テーブルに対応する機能を追加実装していきます。
@@ -120,7 +123,7 @@ style: |
 というように、直感的にわかりやすい名前を付けています。
 
 ---
-
+<!-- _class: line_height_1-5 -->
 ### SecurityConfig.java の更新
 
 これらの新しい窓口も「ログイン前（テスト中）」に触れるように、許可リストへ追加しましょう。

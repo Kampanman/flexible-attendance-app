@@ -62,4 +62,22 @@ public class UserAccountService {
     public List<UserAccount> findAll() {
         return repository.findAll();
     }
+
+    /**
+     * ログイン画面を経由してのログイン
+     * @param userId
+     * @param rawPassword
+     * @return
+     */
+    public UserAccount login(String userId, String rawPassword) {
+        UserAccount user = repository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // rawPassword（入力された平文）と user.getPassword()（DBのハッシュ化済み）を比較
+        if (passwordEncoder.matches(rawPassword, user.getPassword())) {
+            return user;
+        } else {
+            throw new RuntimeException("Invalid password");
+        }
+    }
 }

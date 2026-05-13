@@ -14,4 +14,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
 
     // 打刻履歴の取得API の実装のため追加
     java.util.List<AttendanceRecord> findByAccountIdOrderByClockInDesc(String accountId);
+
+    // accountIdで検索し、作成日時の降順（新しい順）で取得
+    java.util.List<AttendanceRecord> findByAccountIdOrderByCreatedAtDesc(String accountId);
 }
