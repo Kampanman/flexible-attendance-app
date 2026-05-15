@@ -1,17 +1,37 @@
 <template>
   <div class="attendance-board">
-    <h3>ようこそ、{{ userName }} さん</h3>
-    <div class="status-badge" :class="status">
-      現在の状態: {{ status === 'CLOCKED_IN' ? labels.inActive : labels.outActive }}
+
+    <div class="attendance-board">
+      <h3>ようこそ、{{ userName }} さん</h3>
+      <div class="status-badge" :class="status">
+        現在の状態: {{ status === 'CLOCKED_IN' ? labels.inActive : labels.outActive }}
+      </div>
+
+      <div class="actions">
+        <button v-if="status === 'CLOCKED_OUT'" @click="punch('clock-in', labels)" class="btn-in">
+          {{ labels.inAction }}
+        </button>
+        <button v-if="status === 'CLOCKED_IN'" @click="punch('clock-out', labels)" class="btn-out">
+          {{ labels.outAction }}
+        </button>
+      </div>
     </div>
 
-    <div class="actions">
-      <button v-if="status === 'CLOCKED_OUT'" @click="punch('clock-in', labels)" class="btn-in">
-        {{ labels.inAction }}
-      </button>
-      <button v-if="status === 'CLOCKED_IN'" @click="punch('clock-out', labels)" class="btn-out">
-        {{ labels.outAction }}
-      </button>
+    <hr class="divider">
+
+    <div class="history-section">
+      <h4>最近の履歴</h4>
+      <div v-if="history.length === 0" class="no-data">履歴はありません</div>
+      <ul v-else class="history-list">
+        <li v-for="record in history" :key="record.id" class="history-item">
+          <span class="type-badge" :class="record.type">
+            {{ record.type === 'CLOCK_IN' ? labels.inAction : labels.outAction }}
+          </span>
+          <span class="timestamp">
+            {{ new Date(record.createdAt).toLocaleString('ja-JP') }}
+          </span>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
@@ -19,6 +39,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import apiClient from '../api';
+const history = ref([]);
 
 const props = defineProps(['accountId', 'userName', 'mode']);
 
@@ -34,7 +55,7 @@ const labels = computed(() => labelSettings[props.mode || 'attendance']);
 
 const status = ref('CLOCKED_OUT');
 
-// 画面が開いたときに現在の状態を取得
+// ステータス取得
 const fetchStatus = async () => {
   try {
     const response = await apiClient.get(`/attendance/status?accountId=${props.accountId}`);
@@ -44,18 +65,32 @@ const fetchStatus = async () => {
   }
 };
 
+// 履歴取得
+const fetchHistory = async () => {
+  try {
+    const response = await apiClient.get(`/attendance/history?accountId=${props.accountId}`);
+    history.value = response.data;
+  } catch (error) {
+    console.error('履歴取得失敗', error);
+  }
+};
+
 // 打刻処理
-const punch = async (type, labels) => {
+const punch = async (type) => {
   try {
     await apiClient.post(`/attendance/${type}?accountId=${props.accountId}`);
-    alert(`${type === 'clock-in' ? labels.inAction : labels.outAction}しました！`);
-    fetchStatus(); // 打刻後に状態を再取得してボタンを切り替える
+    // 打刻が成功したら、ステータスと履歴の両方を更新する
+    await fetchStatus();
+    await fetchHistory();
   } catch (error) {
     alert('打刻に失敗しました。');
   }
 };
 
-onMounted(fetchStatus);
+onMounted(() => {
+  fetchStatus();
+  fetchHistory(); // 画面が開いたときに履歴も読み込む
+});
 </script>
 
 <style scoped>

@@ -25,14 +25,16 @@ public class UserAccountController {
      * POST http://localhost:8080/api/users/register
      */
     @PostMapping("/register")
-    public ResponseEntity<UserAccount> register(@RequestBody UserAccount account) {
+    public ResponseEntity<String> register(@RequestBody UserAccount account) {
         // @RequestBodyで、届いたJSONデータ（ユーザー名やパスワードなど）を、自動的に UserAccount オブジェクトに変換して取り込む
         try {
             UserAccount savedAccount = userService.registerUser(account);
-            return ResponseEntity.ok(savedAccount);
+            // return ResponseEntity.ok(savedAccount);
+            String completeMessage = "ユーザー登録が完了しました";
+            return ResponseEntity.ok(completeMessage);
         } catch (RuntimeException e) {
             // 重複エラーなどが起きた場合は、400 Bad Request を返す
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 

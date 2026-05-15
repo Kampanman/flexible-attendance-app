@@ -3,9 +3,12 @@ package com.appspace.backend.service;
 import com.appspace.backend.entity.UserAccount;
 import com.appspace.backend.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Optional;
 import java.util.List;  // ←インポートをお忘れなく
@@ -16,8 +19,9 @@ import java.util.List;  // ←インポートをお忘れなく
 public class UserAccountService {
 
     private final UserAccountRepository repository;
-    // Spring Securityが提供する強力なハッシュ化ツール
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder; // 直接 new せず、Springに管理されている部品をもらう
 
     /**
      * 新規ユーザー登録（パスワードをハッシュ化して保存）
@@ -79,5 +83,23 @@ public class UserAccountService {
         } else {
             throw new RuntimeException("Invalid password");
         }
+    }
+
+    // ユーザーの新規登録
+    public void registerNewUser(UserAccount user) {
+        // 1. 重複チェック
+        if (repository.existsByUserId(user.getUserId())) {
+            throw new RuntimeException("このメールアドレスは既に登録されています。");
+        }
+
+        // 2. パスワードのハッシュ化
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        
+        // 3. デフォルト値のセット（必要に応じて）
+        user.setIsAuth(0); // 一般ユーザーとして登録
+        user.setQuitDemand(0); // 退会フラグはオフ
+        
+        // 4. 保存 (accountIdとcreatedAtは@PrePersistで自動生成される)
+        repository.save(user);
     }
 }

@@ -23,8 +23,26 @@ import HelloWorld from './components/HelloWorld.vue'
       </div>
     </header>
     <main>
-      <LoginForm v-if="!user" @login-success="handleLoginSuccess" />
-      <AttendanceBoard v-else :accountId="user.accountId" :userName="user.userName" />
+      <AttendanceBoard 
+        v-if="user" 
+        :accountId="user.accountId" 
+        :userName="user.userName"
+        mode="room"
+      />
+
+      <RegisterForm 
+        v-else-if="isRegisterMode" 
+        @register-success="isRegisterMode = false" 
+        @switch-to-login="isRegisterMode = false" 
+      />
+
+      <div v-else>
+        <LoginForm @login-success="handleLoginSuccess" />
+        <div class="switch-mode-link">
+          <p>アカウントをお持ちでないですか？</p>
+          <button @click="isRegisterMode = true" class="text-button">新規ユーザー登録</button>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -33,9 +51,11 @@ import HelloWorld from './components/HelloWorld.vue'
 import { ref } from 'vue';
 import LoginForm from './components/LoginForm.vue';
 import AttendanceBoard from './components/AttendanceBoard.vue';
+import RegisterForm from './components/RegisterForm.vue';
 
 const user = ref(null);
 const isMenuOpen = ref(false);
+const isRegisterMode = ref(false);
 
 const handleLoginSuccess = (userData) => {
   user.value = userData;
@@ -77,4 +97,21 @@ const logout = () => {
   cursor: pointer;
 }
 .user-info { font-size: 0.9rem; margin: 5px 0; }
+.switch-mode-link {
+  margin-top: 30px; /* メッセージとの間隔を広げる */
+  text-align: center;
+}
+.text-button {
+  background-color: #007bff; /* ログインボタンと同色（青系） */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px; /* ボタンを大きく */
+  font-size: 1rem;
+  cursor: pointer; /* マウスカーソルを指マークに */
+  transition: background-color 0.3s;
+}
+.text-button:hover {
+  background-color: #0056b3; /* ホバー時に少し暗く */
+}
 </style>
