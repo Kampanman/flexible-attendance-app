@@ -2,13 +2,15 @@ import { createRouter, createWebHistory } from 'vue-router';
 import LoginForm from '../components/LoginForm.vue';
 import RegistForm from '../components/RegisterForm.vue';
 import AttendanceBoard from '../components/AttendanceBoard.vue';
-import DashboardView from '../components/DashboardView.vue'; // ← 追加
+import DashboardView from '../components/DashboardView.vue';
+import AccountEdit from '../components/AccountEditView.vue';
 
 const routes = [
   { path: '/login', component: LoginForm },
   { path: '/register', component: RegistForm },
   { path: '/attendance', component: AttendanceBoard },
-  { path: '/dashboard', component: DashboardView }, // ← 追加
+  { path: '/dashboard', component: DashboardView },
+  { path: '/account-edit', component: AccountEdit },
   { path: '/', redirect: '/login' } // 初期アクセスはログインへ
 ];
 

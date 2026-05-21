@@ -3,19 +3,39 @@
 
     <div class="attendance-board">
       <h3>ようこそ、{{ userName }} さん</h3>
-      <div class="status-badge" :class="status">
-        現在の状態: {{ status === 'CLOCKED_IN' ? labels.inActive : labels.outActive }}
-      </div>
 
-      <div class="actions">
-        <button v-if="status === 'CLOCKED_OUT'" @click="punch('clock-in', labels)" class="btn-in">
-          {{ labels.inAction }}
-        </button>
-        <button v-else-if="status === 'CLOCKED_IN'" @click="punch('clock-out', labels)" class="btn-out">
-          {{ labels.outAction }}
-        </button>
-        <button v-else disabled class="btn btn-disabled">読み込み中...</button>
-      </div>
+    <div class="status-display">
+      <p>現在の状態：
+        <span :class="status === 'CLOCKED_IN' ? 'status-in' : 'status-out'">
+          {{ status === 'CLOCKED_IN' ? currentLabels.inActive : currentLabels.outActive }}
+        </span>
+      </p>
+    </div>
+
+    <div class="punch-actions">
+      <button 
+        v-if="status === 'CLOCKED_OUT'" 
+        @click="punch('CLOCK_IN')" 
+        class="btn btn-in"
+      >
+        {{ currentLabels.inAction }}する
+      </button>
+
+      <button 
+        v-else 
+        @click="punch('CLOCK_OUT')" 
+        class="btn btn-out"
+      >
+        {{ currentLabels.outAction }}する
+      </button>
+    </div>
+
+    <div class="mode-switcher" v-if="status === 'CLOCKED_OUT'">
+      <button @click="currentMode = 'attendance'" :class="{ active: currentMode === 'attendance' }">勤怠モード</button>
+      <button @click="currentMode = 'room'" :class="{ active: currentMode === 'room' }">入退室モード</button>
+      <button @click="currentMode = 'session'" :class="{ active: currentMode === 'session' }">出席退席モード</button>
+    </div>
+
     </div>
 
     <hr class="divider">
@@ -25,9 +45,9 @@
       <ul class="history-list">
         <li v-for="(entry, index) in pairedHistory" :key="index" class="history-item">
           <span class="date">{{ entry.date }}</span>
-          <span class="time">入室: {{ entry.inTime }}</span>
+          <span class="time">Entry: {{ entry.inTime }}</span>
           <span class="separator"> ～ </span>
-          <span class="time">退室: {{ entry.outTime }}</span>
+          <span class="time">Exit: {{ entry.outTime }}</span>
         </li>
       </ul>
     </div>
@@ -44,9 +64,10 @@ const history = ref([]);
 const loggedInAccountId = ref('');
 const userName = ref('');
 
-// AttendanceBoard.vue の <script setup> 内に追加するコード
+// 現在の表示モードを管理する変数（初期値を 'attendance' に設定）
+const currentMode = ref('attendance'); 
 
-// 履歴データを格納する配列（※もし既存の変数名があればそれに合わせてください）
+// 履歴データを格納する配列
 const attendanceHistory = ref([]); 
 
 /**
@@ -65,16 +86,6 @@ const fetchAttendanceHistory = async (id) => {
     console.error('打刻履歴の取得に失敗しました:', error);
   }
 };
-
-const props = defineProps({
-  accountId: String,
-  userName: String,
-  mode: String,
-  history: {
-    type: Array,
-    default: () => [] // 渡されない場合は空配列をデフォルトにする
-  }
-});
 
 onMounted(() => {
   // LoginForm.vue が保存した 'user' データを読み出す
@@ -98,16 +109,25 @@ const labelSettings = {
   session:    { inActive: '出席中', outActive: '退席中', inAction: '出席', outAction: '退席' }
 };
 
+// 現在選択されているモードのラベル群を返す
+const currentLabels = computed(() => {
+  return labelSettings[currentMode.value] || labelSettings.attendance;
+});
+
 // 現在のモード（propsから受け取る。デフォルトは 'attendance'）
 const labels = computed(() => labelSettings[props.mode || 'attendance']);
 
 const status = ref('CLOCKED_OUT');
 
-// ステータス取得
+// 現在の就業ステータス
+const currentStatus = ref(0)
+
+// ステータス取得API
 const fetchStatus = async () => {
+  if (!loggedInAccountId.value) return;
   try {
     const response = await apiClient.get(`/attendance/status?accountId=${loggedInAccountId.value}`);
-    status.value = response.data; // "CLOCKED_IN" or "CLOCKED_OUT"
+    status.value = response.data; // バックエンドから "CLOCKED_IN" または "CLOCKED_OUT" が届く
   } catch (error) {
     console.error('ステータス取得失敗', error);
   }
@@ -168,12 +188,12 @@ const pairedHistory = computed(() => {
 const emit = defineEmits(['refresh-history']);
 
 // 打刻処理
-const punch = async (type, labels) => {
+const punch = async (type) => {
   try {
     // 1. クエリパラメータ形式から、JSON ボディ形式に変更
     // バックエンドの @RequestBody Map<String, String> request と一致させます
+    console.log("accountId: " + loggedInAccountId.value + ", type: " + type);
     await apiClient.post('/attendance/punch', {
-      // accountId: props.accountId,      // route設定前であればprops.accountIdから取得するのでよい
       accountId: loggedInAccountId.value, // route設定後はpropsではなく、ローカルストレージから復元した変数を指定
       type: type  // 'CLOCK_IN' または 'CLOCK_OUT'
     });
@@ -230,5 +250,43 @@ onMounted(() => {
   padding: 8px 0;
   border-bottom: 1px solid #444; /* 各行に薄い区切り線 */
   font-family: monospace; /* 時間の数字を揃えやすくするため */
+}
+
+/* モード切り替えボタンのコンテナ（親要素） */
+.mode-switcher {
+  display: flex;            /* ボタンを横並びにする */
+  justify-content: center;  /* 中央寄せにする */
+  gap: 12px;                /* ★ボタンとボタンの間の余白（隙間）を適度にとる */
+  margin-top: 25px;         /* 打刻エリアとの上下のディスタンス */
+  margin-bottom: 20px;
+  flex-wrap: wrap;          /* 画面幅が狭いときは自動で綺麗に折り返すようにする安全策 */
+}
+
+/* モード切り替えボタン単体のデザイン */
+.mode-switcher button {
+  background-color: #f8f9fa; /* 普段は主張しすぎない上品な薄いグレー */
+  color: #495057;
+  border: 1px solid #ced4da;
+  padding: 10px 16px;        /* ★上下10px、左右16pxの内側余白をとり、押しやすい大きさに */
+  border-radius: 6px;        /* 角を少し丸めてモダンな印象に */
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease; /* マウスを乗せた時やクリックした時の変化を滑らかにする */
+}
+
+/* マウスホバー時のエフェクト */
+.mode-switcher button:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+}
+
+/* 現在アクティブ（選択中）なモードのボタンを強調するスタイル */
+/* もしHTML側で「:class="{ active: currentMode === 'attendance' }"」のように制御する場合に輝きます */
+.mode-switcher button.active {
+  background-color: #007bff;
+  color: white;
+  border-color: #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
 }
 </style>

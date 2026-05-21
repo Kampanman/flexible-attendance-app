@@ -10,35 +10,26 @@ import HelloWorld from './components/HelloWorld.vue'
 <template>
   <div id="app">
     <AppHeader v-if="showHeader" />
-    
-    <main class="main-content" :class="{ 'has-header': showHeader }">
+
+    <main class="main-content">
       <router-view />
     </main>
   </div>
 </template>
-
 <script setup>
-import { ref } from 'vue';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import AppHeader from './components/AppHeader.vue';
-import LoginForm from './components/LoginForm.vue';
-import AttendanceBoard from './components/AttendanceBoard.vue';
-import RegisterForm from './components/RegisterForm.vue';
+import AppHeader from './components/AppHeader.vue'; // パスは環境に合わせてください
 
-// ログイン前（初期・登録）か、ログイン後（打刻・ダッシュボード）かをURLパスで判定
+const route = useRoute();
+
+// ★現在のURL（パス）を監視し、ログイン・登録画面ではない場合のみ true を返す
 const showHeader = computed(() => {
-  // window.location.pathname を使うことで、ルーターの初期化前でも確実に現在のURLを取得します
-  const currentPath = window.location.pathname;
-
-  // ルートパス「/」はログイン画面にリダイレクトされる想定のため、
-  // 「/」「/login」「/register」の3つのときはヘッダーを「非表示（false）」にします
-  if (currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
-    return false;
-  }
+  // route.path が取得できるまでの安全対策を含める
+  if (!route?.path) return false;
   
-  // それ以外の画面（/dashboard や /attendance など）では「表示（true）」にします
-  return true;
+  // URLが '/login' または '/register' の時はヘッダーを「非表示(false)」にする
+  return !(route.path === '/login' || route.path === '/register');
 });
 </script>
 

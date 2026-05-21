@@ -102,4 +102,35 @@ public class UserAccountService {
         // 4. 保存 (accountIdとcreatedAtは@PrePersistで自動生成される)
         repository.save(user);
     }
+
+    /**
+     * アカウント情報の更新処理
+     * @param requestData フロントから届いた更新用データ（accountId, userName, passwordを含む）
+     * @return 更新後のユーザー情報
+     */
+    public UserAccount updateUser(UserAccount requestData) {
+        // 1. accountId を基に、既存のユーザーをデータベースから検索
+        UserAccount existingUser = repository.findById(requestData.getAccountId())
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません。"));
+
+        // 2. ユーザー名の更新
+        if (requestData.getUserName() != null && !requestData.getUserName().trim().isEmpty()) {
+            existingUser.setUserName(requestData.getUserName().trim());
+        }
+
+        // 3. パスワードの更新チェック
+        if (requestData.getPassword() != null && !requestData.getPassword().trim().isEmpty()) {
+            // パスワードが入力されている（nullでも空文字でもない）場合のみ、ハッシュ化して上書きする
+            String encodedPassword = passwordEncoder.encode(requestData.getPassword());
+            existingUser.setPassword(encodedPassword);
+        }
+
+        // 4. 自己紹介（about）など、もし他の編集可能フィールドがあれば同様にマッピング
+        if (requestData.getAbout() != null) {
+            existingUser.setAbout(requestData.getAbout());
+        }
+
+        // 5. データベースへ上書き保存（JPAの仕様により、既存レコードへのsaveはUPDATE文になります）
+        return repository.save(existingUser);
+    }
 }

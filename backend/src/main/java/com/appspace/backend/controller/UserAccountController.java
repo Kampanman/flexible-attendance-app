@@ -61,4 +61,22 @@ public class UserAccountController {
     public List<UserAccount> debugList() {
         return userService.findAll(); // findAll()メソッドをServiceに作る必要があります
     }
+
+    /**
+     * アカウント情報の更新を受け付けるエンドポイント
+     * PUT http://localhost:8080/api/users/update
+     */
+    @PutMapping("/update")
+    public ResponseEntity<String> updateAccount(@RequestBody UserAccount accountRequest) {
+        try {
+            // サービス層の更新処理を呼び出す
+            userService.updateUser(accountRequest);
+            
+            // Vue側で「更新成功」をトリガーにするためのメッセージを返す
+            return ResponseEntity.ok("アカウント情報を更新しました。");
+        } catch (RuntimeException e) {
+            // ユーザーが見つからないなどのエラー時は 400 Bad Request
+            return ResponseEntity.badRequest().body("更新に失敗しました: " + e.getMessage());
+        }
+    }
 }
