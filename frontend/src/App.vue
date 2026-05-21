@@ -9,67 +9,45 @@ import HelloWorld from './components/HelloWorld.vue'
  -->
 <template>
   <div id="app">
-    <header v-if="user" class="app-header">
-      <div class="logo">勤怠システム</div>
-      <div class="menu-container">
-        <button @click="isMenuOpen = !isMenuOpen" class="hamburger">
-          <span></span><span></span><span></span>
-        </button>
-        <div v-if="isMenuOpen" class="dropdown-menu">
-          <p class="user-info">{{ user.userName }} さん</p>
-          <hr>
-          <button @click="logout" class="logout-btn">ログアウト</button>
-        </div>
-      </div>
-    </header>
-    <main>
-      <AttendanceBoard 
-        v-if="user" 
-        :accountId="user.accountId" 
-        :userName="user.userName"
-        mode="room"
-      />
-
-      <RegisterForm 
-        v-else-if="isRegisterMode" 
-        @register-success="isRegisterMode = false" 
-        @switch-to-login="isRegisterMode = false" 
-      />
-
-      <div v-else>
-        <LoginForm @login-success="handleLoginSuccess" />
-        <div class="switch-mode-link">
-          <p>アカウントをお持ちでないですか？</p>
-          <button @click="isRegisterMode = true" class="text-button">新規ユーザー登録</button>
-        </div>
-      </div>
+    <AppHeader v-if="showHeader" />
+    
+    <main class="main-content" :class="{ 'has-header': showHeader }">
+      <router-view />
     </main>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router';
+import AppHeader from './components/AppHeader.vue';
 import LoginForm from './components/LoginForm.vue';
 import AttendanceBoard from './components/AttendanceBoard.vue';
 import RegisterForm from './components/RegisterForm.vue';
 
-const user = ref(null);
-const isMenuOpen = ref(false);
-const isRegisterMode = ref(false);
+// ログイン前（初期・登録）か、ログイン後（打刻・ダッシュボード）かをURLパスで判定
+const showHeader = computed(() => {
+  // window.location.pathname を使うことで、ルーターの初期化前でも確実に現在のURLを取得します
+  const currentPath = window.location.pathname;
 
-const handleLoginSuccess = (userData) => {
-  user.value = userData;
-};
-
-const logout = () => {
-  if (confirm('ログアウトしますか？')) {
-    user.value = null; // ユーザー情報を空にするだけで、v-ifによりログイン画面に戻ります
-    isMenuOpen.value = false;
+  // ルートパス「/」はログイン画面にリダイレクトされる想定のため、
+  // 「/」「/login」「/register」の3つのときはヘッダーを「非表示（false）」にします
+  if (currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
+    return false;
   }
-};
+  
+  // それ以外の画面（/dashboard や /attendance など）では「表示（true）」にします
+  return true;
+});
 </script>
 
 <style scoped>
+/* ヘッダー固定に伴い、コンテンツが下に隠れないように余白を作る */
+.main-content.has-header {
+  padding-top: 80px; 
+}
+
 .app-header { display: flex;
   justify-content: space-between;
   align-items: center;

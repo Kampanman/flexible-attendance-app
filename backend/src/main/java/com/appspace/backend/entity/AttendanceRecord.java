@@ -3,6 +3,7 @@ package com.appspace.backend.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import jakarta.persistence.PrePersist;
 
 @Entity
@@ -23,12 +24,15 @@ public class AttendanceRecord {
     @Column(length = 20)
     private String status; // 例: "出勤中", "退勤済み"
 
+    private String type;
+    
     private String memo;
 
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        // LocalDateTime.now() に日本のタイムゾーンを指定します
+        this.createdAt = LocalDateTime.now(ZoneId.of("Asia/Tokyo"));
     }
 }

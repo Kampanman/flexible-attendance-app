@@ -17,4 +17,7 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
 
     // accountIdで検索し、作成日時の降順（新しい順）で取得
     java.util.List<AttendanceRecord> findByAccountIdOrderByCreatedAtDesc(String accountId);
+
+    // accountIdで検索し、作成日時の降順で並べた最初の1件を取得する
+    Optional<AttendanceRecord> findFirstByAccountIdOrderByCreatedAtDesc(String accountId);
 }

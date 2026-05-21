@@ -4,7 +4,11 @@ import com.appspace.backend.entity.AttendanceRecord;
 import com.appspace.backend.service.AttendanceRecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/attendance")
@@ -45,17 +49,6 @@ public class AttendanceController {
     }
 
     /**
-     * 打刻履歴の取得API の実装のため追加
-     * 打刻履歴一覧を取得する
-     * GET http://localhost:8080/api/attendance/history?accountId=ユーザーID
-     */
-    @GetMapping("/history")
-    public ResponseEntity<java.util.List<AttendanceRecord>> getHistory(@RequestParam String accountId) {
-        java.util.List<AttendanceRecord> history = attendanceService.getHistory(accountId); 
-        return ResponseEntity.ok(history);
-    }
-
-    /**
      * ステータス確認API の実装のため追加
      * 現在のステータスを確認する
      * GET http://localhost:8080/api/attendance/status?accountId=ユーザーID
@@ -63,7 +56,39 @@ public class AttendanceController {
     @GetMapping("/status")
     public ResponseEntity<String> getStatus(@RequestParam String accountId) {
         String status = attendanceService.getCurrentStatus(accountId);
+        String change_status = attendanceService.getAttendanceStatus(accountId);
+        
         // 文字列をそのまま返すとJSONとして扱いにくいため、シンプルなテキストで返します
-        return ResponseEntity.ok(status);
+        return ResponseEntity.ok(change_status);
+    }
+
+    /**
+     * 打刻履歴の取得API の実装のため追加
+     * 打刻履歴一覧を取得する
+     * GET http://localhost:8080/api/attendance/history/{accountId=ユーザーID}
+     */
+    @GetMapping("/history/{accountId}")
+    public ResponseEntity<List<AttendanceRecord>> getHistory(@PathVariable String accountId) {
+        List<AttendanceRecord> history = attendanceService.getHistoryByAccountId(accountId);
+        return ResponseEntity.ok(history);
+    }
+
+    /**
+     * 打刻リクエストを受け取ってDBに保存するメソッド
+     * @param request
+     * @return
+     */
+    @PostMapping("/punch")
+    public ResponseEntity<String> punch(@RequestBody Map<String, String> request) {
+        String accountId = request.get("accountId");
+        String type = request.get("type"); // CLOCK_IN または CLOCK_OUT
+
+        // サービスを呼び出して保存処理を実行
+        try {
+            attendanceService.savePunch(accountId, type);
+            return ResponseEntity.ok("打刻に成功しました");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("打刻失敗: " + e.getMessage());
+        }
     }
 }
