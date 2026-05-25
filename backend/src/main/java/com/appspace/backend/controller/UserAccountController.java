@@ -104,9 +104,18 @@ public class UserAccountController {
     public ResponseEntity<String> quitAccount(@RequestBody AccountUpdateRequest quitRequest) {
         try {
             logger.info("=== 退会申請リクエストを受信 ===");
-            logger.info("    accountId:{}", quitRequest.getAccountId());
+            logger.info("    accountId: {}", quitRequest.getAccountId());
 
-            // サービス層の退会申請処理を呼び出す
+            // 1. セーフティガード：対象のアカウント情報を取得
+            UserAccount targetUser = userService.findByAccountId(quitRequest.getAccountId());
+
+            // 2. もし対象が初期統括管理者のメールアドレスだったら申請を強制ブロックする
+            if ("admin@example.com".equals(targetUser.getUserId())) {
+                logger.warn("[警告] 統括管理者に対する退会申請が拒絶されました。");
+                return ResponseEntity.badRequest().body("エラー：統括管理者アカウントは削除できません。");
+            }
+
+            // 3. 安全が確認されたらサービス層の退会申請処理を呼び出す
             userService.applyQuitDemand(quitRequest.getAccountId());
 
             return ResponseEntity.ok("アカウント削除申請を受け付けました。");

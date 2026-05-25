@@ -52,6 +52,19 @@ public class UserAccountService {
     }
 
     /**
+     * アカウントIDでユーザーを探す
+     * 
+     * @param accountId
+     * @return
+     */
+    public UserAccount findByAccountId(String accountId) {
+        UserAccount user = repository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません。"));
+
+        return user;
+    }
+
+    /**
      * ユーザー認証（ログインチェック）
      * ハッシュ化されたパスワード（$2a$10$...）と、ユーザーが入力した生のパスワード（mysecretpassword）を安全に照合するために設けている
      * このサービスを呼び出すための「ログイン窓口（エンドポイント）」は、UserAccountController.javaに設けられている
