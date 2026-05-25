@@ -68,7 +68,7 @@ const handleRegister = async () => {
   }
   
   try {
-    const response = await fetch('https://ubiquitous-spork-4vq65g5rr79c5j6q-8080.app.github.dev/api/users/register', {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

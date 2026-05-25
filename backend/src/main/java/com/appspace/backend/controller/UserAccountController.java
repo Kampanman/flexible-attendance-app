@@ -1,21 +1,30 @@
 package com.appspace.backend.controller;
 
+import java.util.List; // ←インポートをお忘れなく
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.appspace.backend.entity.UserAccount;
 import com.appspace.backend.service.UserAccountService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;  // ←インポートをお忘れなく
-
-@RestController  // 「画面（HTML）」ではなく「データ（JSON）」を返す窓口であることを示す（htmlの場合は@Controller）
-@RequestMapping("/api/users")  // コントローラーが扱うURLの共通ルート
+@RestController // 「画面（HTML）」ではなく「データ（JSON）」を返す窓口であることを示す（htmlの場合は@Controller）
+@RequestMapping("/api/users") // コントローラーが扱うURLの共通ルート
 @RequiredArgsConstructor
-@CrossOrigin(origins = "https://*.app.github.dev") // Codespacesのフロントエンドからのアクセスを許可
+@CrossOrigin(origins = "${cors.allowed-origins}")
 /**
  * GitHub Codespacesでは、フロントエンド（Vue.js）とバックエンド（Spring Boot）でURLが異なる
+ * 
  * @CrossOriginの設定がないとセキュリティ制限で通信がブロックされることになる
- */ 
+ */
 public class UserAccountController {
 
     private final UserAccountService userService;
@@ -71,7 +80,7 @@ public class UserAccountController {
         try {
             // サービス層の更新処理を呼び出す
             userService.updateUser(accountRequest);
-            
+
             // Vue側で「更新成功」をトリガーにするためのメッセージを返す
             return ResponseEntity.ok("アカウント情報を更新しました。");
         } catch (RuntimeException e) {

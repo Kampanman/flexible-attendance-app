@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../api'; // ※お使いの共通APIクライアントのパスに合わせて調整してください
 
@@ -89,8 +89,8 @@ const handleUpdate = async () => {
   isSubmitting.value = true;
 
   try {
-    // 先ほどJava側で作成した PUT /api/users/update を叩く
-    await apiClient.put('/api/users/update', {
+    // 先ほどJava側で作成した PUT /users/update を叩く
+    await apiClient.put('/users/update', {
       accountId: accountId.value,
       userName: userName.value,
       password: password.value || null // 空白ならnullを送り、Java側で維持させる
