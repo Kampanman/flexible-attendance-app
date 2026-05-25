@@ -10,7 +10,566 @@ style: |
 ---
 
 <!-- _class: frontpage -->
-# backendのAPI動作確認
+# backendのAPI作成・動作確認
+
+---
+
+## 作成が必要な初期API用のバックエンドファイル
+
+まずは後続のAPI動作確認に向けて、バックエンド側では以下の構成でファイルを準備しておきます。
+
+```text
+/flexible-attendance-app/backend/src/main
+  ├──java/com/appspace/backend
+  |   ├── config
+  |   |    └── SecurityConfig.java
+  |   ├── controller
+  |   |    ├── AttendanceController.java
+  |   |    └── UserAccountController.java
+  |   ├── entity
+  |   |    ├── AttendanceRecord.java
+  |   |    └── UserAccount.java
+  |   ├── repository
+  |   |    ├── AttendanceRecordRepository.java
+  |   |    └── UserAccountRepository.java
+  |   ├── service
+  |   |    ├── AttendanceRecordService.java
+  |   |    └── UserAccountService.java
+```
+
+---
+
+```text
+  |   └── BackendApplication.java
+  └── resources
+        └── application.properties
+```
+
+上記にまとめたファイルそれぞれの記述内容は、以下のとおりとなっております。
+
+### `SecurityConfig.java`
+
+```java
+package com.appspace.backend.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+```
+
+---
+
+```java
+public class SecurityConfig {
+    /**
+     * Beanアノテーションを一言でいうなら、Springという工場に部品（オブジェクト）の作り方を教えて、工場の管理リストに登録してもらうための印。
+     * SpringBootでは「インスタンスの作成や管理を丸投げする」という手法（DI：依存性の注入）が可能であり、いちいち「new MyClass()」とする必要がない。
+     * Beanアノテーションを用いることで、Spring標準の動きを上書きしたり、独自のルールを登録することが出来るのである。
+     */
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable()) // テスト用なのでCSRF保護を無効化
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/users/register", "/api/users/login", "/api/attendance/**").permitAll() // /attendance/** で配下をすべて許可
+                .anyRequest().authenticated()
+            );
+        return http.build();
+    }
+}
+```
+
+### `AttendanceController.java`
+
+```java
+package com.appspace.backend.controller;
+
+import com.appspace.backend.entity.AttendanceRecord;
+import com.appspace.backend.service.AttendanceRecordService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+```
+
+---
+
+```java
+
+@RestController
+@RequestMapping("/api/attendance")
+@RequiredArgsConstructor
+@CrossOrigin(origins = "https://*.app.github.dev")
+public class AttendanceController {
+
+    private final AttendanceRecordService attendanceService;
+
+    /**
+     * 出勤打刻を受け付ける
+     * POST http://localhost:8080/api/attendance/clock-in?accountId=ユーザーID
+     */
+    @PostMapping("/clock-in")
+    public ResponseEntity<AttendanceRecord> clockIn(@RequestParam String accountId) {
+        try {
+            AttendanceRecord record = attendanceService.clockIn(accountId);
+            return ResponseEntity.ok(record);
+        } catch (RuntimeException e) {
+            // 既に二重出勤などのエラーが発生した場合
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+```
+
+---
+
+```java
+    /**
+     * 退勤打刻を受け付ける
+     * POST http://localhost:8080/api/attendance/clock-out?accountId=ユーザーID
+     */
+    @PostMapping("/clock-out")
+    public ResponseEntity<AttendanceRecord> clockOut(@RequestParam String accountId) {
+        try {
+            AttendanceRecord record = attendanceService.clockOut(accountId);
+            return ResponseEntity.ok(record);
+        } catch (RuntimeException e) {
+            // 出勤データがない、または既に退勤済みの場合
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    /**
+     * 打刻履歴の取得API の実装のため追加
+     * 打刻履歴一覧を取得する
+     * GET http://localhost:8080/api/attendance/history?accountId=ユーザーID
+     */
+    @GetMapping("/history")
+    public ResponseEntity<java.util.List<AttendanceRecord>> getHistory(@RequestParam String accountId) {
+        java.util.List<AttendanceRecord> history = attendanceService.getAllRecords(accountId);
+        return ResponseEntity.ok(history);
+    }
+
+```
+
+---
+
+```java
+    /**
+     * ステータス確認API の実装のため追加
+     * 現在のステータスを確認する
+     * GET http://localhost:8080/api/attendance/status?accountId=ユーザーID
+     */
+    @GetMapping("/status")
+    public ResponseEntity<String> getStatus(@RequestParam String accountId) {
+        String status = attendanceService.getCurrentStatus(accountId);
+        // 文字列をそのまま返すとJSONとして扱いにくいため、シンプルなテキストで返します
+        return ResponseEntity.ok(status);
+    }
+}
+```
+
+### `UserAccountController.java`
+
+```java
+package com.appspace.backend.controller;
+
+import com.appspace.backend.entity.UserAccount;
+import com.appspace.backend.service.UserAccountService;
+```
+
+---
+
+```java
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController  // 「画面（HTML）」ではなく「データ（JSON）」を返す窓口であることを示す（htmlの場合は@Controller）
+@RequestMapping("/api/users")  // コントローラーが扱うURLの共通ルート
+@RequiredArgsConstructor
+@CrossOrigin(origins = "https://*.app.github.dev") // Codespacesのフロントエンドからのアクセスを許可
+/**
+ * GitHub Codespacesでは、フロントエンド（Vue.js）とバックエンド（Spring Boot）でURLが異なる
+ * @CrossOriginの設定がないとセキュリティ制限で通信がブロックされることになる
+ */ 
+public class UserAccountController {
+
+    private final UserAccountService userService;
+
+    /**
+     * ユーザー新規登録を受け付けるエンドポイント
+     * POST http://localhost:8080/api/users/register
+     */
+    @PostMapping("/register")
+    public ResponseEntity<UserAccount> register(@RequestBody UserAccount account) {
+        // @RequestBodyで、届いたJSONデータ（ユーザー名やパスワードなど）を、自動的に UserAccount オブジェクトに変換して取り込む
+        try {
+            UserAccount savedAccount = userService.registerUser(account);
+            return ResponseEntity.ok(savedAccount);
+        } catch (RuntimeException e) {
+            // 重複エラーなどが起きた場合は、400 Bad Request を返す
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+```
+
+---
+
+```java
+    /**
+     * ログイン処理を受け付けるエンドポイント
+     * POST http://localhost:8080/api/users/login
+     * SecurityConfig.javaに、このエンドポイントを許可する設定を追加している
+     */
+    @PostMapping("/login")
+    public ResponseEntity<UserAccount> login(@RequestBody UserAccount loginRequest) {
+        return userService.authenticate(loginRequest.getUserId(), loginRequest.getPassword())
+                .map(user -> {
+                    // 最終ログイン日時を更新するなどの処理をここに書くことも可能
+                    return ResponseEntity.ok(user);
+                })
+                .orElse(ResponseEntity.status(401).build()); // 認証失敗時は 401 Unauthorized
+    }
+}
+```
+
+### `AttendanceRecord.java`
+
+```java
+package com.appspace.backend.entity;
+
+import jakarta.persistence.*;
+```
+
+---
+
+```java
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "apply_attendance_records")
+@Data
+public class AttendanceRecord {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String accountId; // UserAccountのaccountIdと紐付け
+
+    private LocalDateTime clockIn;  // 出勤時刻
+    private LocalDateTime clockOut; // 退勤時刻
+
+    @Column(length = 20)
+    private String status; // 例: "出勤中", "退勤済み"
+
+    private String memo;
+}
+```
+
+---
+
+### `UserAccount.java`
+
+```java
+package com.appspace.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "apply_user_accounts")
+
+@Data  // GetterやSetterを自分で書く必要がなくなる
+public class UserAccount {
+
+    @Id
+    @Column(length = 36)
+    private String accountId; // UUIDを利用した16桁〜36桁の値[cite: 1]
+
+    @Column(nullable = false, length = 30)
+    private String userName;
+
+    @Column(nullable = false, unique = true)
+    private String userId; // メールアドレス[cite: 1]
+
+```
+
+---
+
+```java
+    @Column(nullable = false)
+    private String password; // BCryptハッシュ化済みパスワード[cite: 1]
+
+    @Column(nullable = false)
+    private int isAuth = 0; // 0:一般, 1:管理者[cite: 1]
+
+    @Column(nullable = false)
+    private int quitDemand = 0; // 退会申請フラグ[cite: 1]
+
+    @Column(columnDefinition = "TEXT")
+    private String about;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime lastLoginAt;
+
+    // レコード作成前に自動でUUIDを生成・日時をセットする
+    @PrePersist  // データベースに保存される直前に、Java側で自動的にUUIDと作成日時を生成する
+    protected void onCreate() {
+        if (this.accountId == null) {
+            this.accountId = UUID.randomUUID().toString();
+        }
+        this.createdAt = LocalDateTime.now();
+    }
+}
+```
+
+---
+
+### `AttendanceRecordRepository.java`
+
+```java
+package com.appspace.backend.repository;
+
+import com.appspace.backend.entity.AttendanceRecord;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface AttendanceRecordRepository extends JpaRepository<AttendanceRecord, Long> {
+    
+    // 特定のユーザーの、最新の打刻記録を1件だけ取得する
+    // これにより「前回出勤したのか、退勤したのか」を判定できます
+    Optional<AttendanceRecord> findFirstByAccountIdOrderByIdDesc(String accountId);
+
+    // 打刻履歴の取得API の実装のため追加
+    java.util.List<AttendanceRecord> findByAccountIdOrderByClockInDesc(String accountId);
+}
+```
+
+---
+
+### `UserAccountRepository.java`
+
+```java
+package com.appspace.backend.repository;
+
+import com.appspace.backend.entity.UserAccount;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface UserAccountRepository extends JpaRepository<UserAccount, String> {
+    // JpaRepository<UserAccount, String>
+    // これを継承するだけで、save()（保存）、findAll()（全件取得）、deleteById()（削除）といった標準機能が自動的に使えるようになる
+
+    // 仕様書に基づき、ログインID（メールアドレス）でユーザーを検索するメソッドを追加[cite: 1]
+    // Optionalなのは、ユーザーが見つからなかった場合に「NULL」ではなく「空の状態」として安全に扱えるようするため
+    Optional<UserAccount> findByUserId(String userId);
+
+    // ユーザー名が含まれているものを検索する（管理者用のアカウント検索などで利用）[cite: 1]
+    java.util.List<UserAccount> findByUserNameContaining(String userName);
+}
+```
+
+### `AttendanceRecordService.java`
+
+```java
+package com.appspace.backend.service;
+```
+
+---
+
+```java
+
+import com.appspace.backend.entity.AttendanceRecord;
+import com.appspace.backend.repository.AttendanceRecordRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class AttendanceRecordService {
+
+    private final AttendanceRecordRepository repository;
+
+    /**
+     * 出勤打刻
+     */
+    public AttendanceRecord clockIn(String accountId) {
+        // 最新のレコードを確認し、既に出勤中（退勤していない）ならエラーにする
+        repository.findFirstByAccountIdOrderByIdDesc(accountId)
+                .ifPresent(lastRecord -> {
+                    if (lastRecord.getClockOut() == null) {
+                        throw new RuntimeException("既に提出済みの出勤記録があります。退勤を先に完了してください。");
+                    }
+                });
+
+```
+
+---
+
+```java
+        AttendanceRecord record = new AttendanceRecord();
+        record.setAccountId(accountId);
+        record.setClockIn(LocalDateTime.now());
+        record.setStatus("出勤中");
+        return repository.save(record);
+    }
+
+    /**
+     * 退勤打刻
+     */
+    public AttendanceRecord clockOut(String accountId) {
+        // 最新のレコードを探し、出勤データがない、または既に退勤済みならエラーにする
+        AttendanceRecord lastRecord = repository.findFirstByAccountIdOrderByIdDesc(accountId)
+                .orElseThrow(() -> new RuntimeException("出勤記録が見つかりません。"));
+
+        if (lastRecord.getClockOut() != null) {
+            throw new RuntimeException("既に退勤済みです。");
+        }
+
+        // 既存のレコードに退勤時刻を書き込む
+        lastRecord.setClockOut(LocalDateTime.now());
+        lastRecord.setStatus("退勤済み");
+        return repository.save(lastRecord);
+    }
+
+```
+
+---
+
+```java
+    /**
+     * 打刻履歴の取得API の実装のため追加
+     * 特定のユーザーの全打刻履歴を取得する
+     */
+    public java.util.List<AttendanceRecord> getAllRecords(String accountId) {
+        return repository.findByAccountIdOrderByClockInDesc(accountId);
+    }
+
+    /**
+     * ステータス確認API の実装のため追加
+     * 現在の打刻ステータスを取得する
+     * @return "CLOCKED_IN" (出勤中), "CLOCKED_OUT" (退勤済み/未出勤)
+     */
+    public String getCurrentStatus(String accountId) {
+        return repository.findFirstByAccountIdOrderByIdDesc(accountId)
+                .map(record -> {
+                    if (record.getClockOut() == null) {
+                        return "CLOCKED_IN";
+                    } else {
+                        return "CLOCKED_OUT";
+                    }
+                })
+                .orElse("CLOCKED_OUT"); // 記録が一つもない場合
+    }
+}
+```
+
+---
+
+### `UserAccountService.java`
+
+```java
+package com.appspace.backend.service;
+
+import com.appspace.backend.entity.UserAccount;
+import com.appspace.backend.repository.UserAccountRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor  // これをつけることで、repository を自動的に繋いでくれる（依存性の注入）コードが生成される
+@Transactional  // データベースの処理中にエラーが起きたら、処理を自動でキャンセル（ロールバック）してデータが壊れるのを防ぐ
+public class UserAccountService {
+
+    private final UserAccountRepository repository;
+    // Spring Securityが提供する強力なハッシュ化ツール
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+    /**
+     * 新規ユーザー登録（パスワードをハッシュ化して保存）
+     */
+    public UserAccount registerUser(UserAccount account) {
+        // 1. メールアドレス（userId）の重複チェック
+        if (repository.findByUserId(account.getUserId()).isPresent()) {
+            throw new RuntimeException("このメールアドレスは既に登録されています。");
+        }
+
+```
+
+---
+
+```java
+        // 2. パスワードをBCryptでハッシュ化してセット
+        String encodedPassword = passwordEncoder.encode(account.getPassword());
+        account.setPassword(encodedPassword);
+
+        // 3. データベースへ保存
+        return repository.save(account);
+    }
+
+    /**
+     * ログインID（メールアドレス）でユーザーを探す
+     */
+    public Optional<UserAccount> findByUserId(String userId) {
+        return repository.findByUserId(userId);
+    }
+
+    /**
+     * ユーザー認証（ログインチェック）
+     * ハッシュ化されたパスワード（$2a$10$...）と、ユーザーが入力した生のパスワード（mysecretpassword）を安全に照合するために設けている
+     * このサービスを呼び出すための「ログイン窓口（エンドポイント）」は、UserAccountController.javaに設けられている
+     * @param userId ログインID（メールアドレス）
+     * @param rawPassword 入力された生のパスワード
+     * @return 認証成功時はユーザー情報、失敗時は空
+     */
+    public Optional<UserAccount> authenticate(String userId, String rawPassword) {
+        return repository.findByUserId(userId)
+                .filter(user -> passwordEncoder.matches(rawPassword, user.getPassword()));
+    }
+}
+```
+
+---
+
+### `BackendApplication.java`
+
+```java
+package com.appspace.backend;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BackendApplication {
+
+  public static void main(String[] args) {
+    SpringApplication.run(BackendApplication.class, args);
+  }
+
+}
+
+```
 
 ---
 
