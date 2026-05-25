@@ -1,7 +1,9 @@
 package com.appspace.backend.controller;
 
-import java.util.List; // ←インポートをお忘れなく
+import java.util.List;
 
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.appspace.backend.entity.UserAccount;
 import com.appspace.backend.service.UserAccountService;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 
 @RestController // 「画面（HTML）」ではなく「データ（JSON）」を返す窓口であることを示す（htmlの場合は@Controller）
 @RequestMapping("/api/users") // コントローラーが扱うURLの共通ルート
@@ -28,6 +32,9 @@ import lombok.RequiredArgsConstructor;
 public class UserAccountController {
 
     private final UserAccountService userService;
+
+    @Autowired
+    private Logger logger;
 
     /**
      * ユーザー新規登録を受け付けるエンドポイント
@@ -87,5 +94,35 @@ public class UserAccountController {
             // ユーザーが見つからないなどのエラー時は 400 Bad Request
             return ResponseEntity.badRequest().body("更新に失敗しました: " + e.getMessage());
         }
+    }
+
+    /**
+     * アカウント削除申請（退会申請）を受け付けるエンドポイント
+     * PUT http://localhost:8080/api/users/quit
+     */
+    @PutMapping("/quit")
+    public ResponseEntity<String> quitAccount(@RequestBody AccountUpdateRequest quitRequest) {
+        try {
+            logger.info("=== 退会申請リクエストを受信 ===");
+            logger.info("    accountId:{}", quitRequest.getAccountId());
+
+            // サービス層の退会申請処理を呼び出す
+            userService.applyQuitDemand(quitRequest.getAccountId());
+
+            return ResponseEntity.ok("アカウント削除申請を受け付けました。");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("申請に失敗しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * アカウント更新リクエスト専用のデータ構造（DTO）
+     */
+    @Getter
+    @Setter
+    public static class AccountUpdateRequest {
+        private String accountId;
+        private String userName;
+        private String password;
     }
 }

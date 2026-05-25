@@ -11,7 +11,7 @@ import HelloWorld from './components/HelloWorld.vue'
   <div id="app">
     <AppHeader v-if="showHeader" />
 
-    <main class="main-content">
+    <main :class="['main-content', { 'has-header': showHeader }]">
       <router-view />
     </main>
   </div>

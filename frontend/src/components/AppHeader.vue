@@ -1,24 +1,28 @@
 <template>
   <header class="app-header">
-    <div class="header-title" @click="router.push('/dashboard')">
-      入退室管理システム
+    <div class="header-brand" @click="goHome">
+      <span class="brand-title">勤怠管理システム</span>
     </div>
-    
-    <button class="hamburger-btn" @click="toggleMenu" :class="{ 'is-open': isMenuOpen }">
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
+
+    <button class="menu-trigger" @click="isMenuOpen = !isMenuOpen" :class="{ 'is-active': isMenuOpen }">
+      <span></span>
+      <span></span>
+      <span></span>
     </button>
 
     <transition name="slide">
-      <nav v-if="isMenuOpen" class="dropdown-menu">
-        <ul>
-          <li><a @click="navigate('/dashboard')">ダッシュボード</a></li>
-          <li><a @click="navigate('/attendance')">打刻画面</a></li>
-          <li><a @click="navigate('/schedule-demand')">予定申請</a></li>
-          <li><a @click="navigate('/timechange-demand')">打刻内容編集申請</a></li>
-          <li class="menu-divider"></li>
-          <li><a @click="handleLogout" class="logout-link">ログアウト</a></li>
+      <nav v-if="isMenuOpen" class="nav-menu">
+        <div class="menu-user-info">
+          <p class="user-name">👤 {{ loginUserName }} さん</p>
+          <span v-if="userRole === 1" class="badge-admin">管理者</span>
+        </div>
+
+        <ul class="menu-list">
+          <li v-for="item in menuItems" :key="item.path" class="menu-item">
+            <button @click="navigate(item.path, item.action)" :class="{ 'btn-logout': item.action === 'logout' }">
+              {{ item.label }}
+            </button>
+          </li>
         </ul>
       </nav>
     </transition>
@@ -26,133 +30,190 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const router = useRouter();
+const route = useRoute();
+
 const isMenuOpen = ref(false);
+const loginUserName = ref('ゲスト');
+const userRole = ref(0); // 0: 一般, 1: 管理者
 
-const toggleMenu = () => {
-  isMenuOpen.value = !isMenuOpen.value;
-};
-
-const navigate = (path) => {
-  isMenuOpen.value = false; // メニューを閉じる
-  router.push(path);
-};
-
-const handleLogout = () => {
-  isMenuOpen.value = false;
-  if (confirm('ログアウトしますか？')) {
-    localStorage.removeItem('token'); // 必要に応じて
-    router.push('/login');
+// ローカルストレージからユーザー情報を読み込んで復元する関数
+const loadUserInfo = () => {
+  const userData = localStorage.getItem('user');
+  if (userData) {
+    const user = JSON.parse(userData);
+    loginUserName.value = user.userName;
+    userRole.value = user.isAuth || 0; // 0:一般, 1:管理者
   }
+};
+
+onMounted(() => {
+  loadUserInfo();
+});
+
+// URL（ルート）が変わるたびにユーザー情報を再チェックする（画面遷移時の同期対策）
+watch(() => route.path, () => {
+  loadUserInfo();
+  isMenuOpen.value = false; // 画面遷移したらメニューを自動で閉じる
+});
+
+// 表示すべきメニュー項目をユーザーの権限に応じて動的に計算
+const menuItems = computed(() => {
+  // 全ユーザーに共通して表示するメニュー
+  const items = [
+    { label: 'ダッシュボード', path: '/dashboard' },
+    { label: '打刻画面', path: '/attendance' },
+    { label: '予定申請', path: '/schedule-request' },      // パスは既存の定義に合わせてください
+    { label: '打刻内容編集申請', path: '/edit-request' }, // パスは既存の定義に合わせてください
+    { label: 'アカウント情報編集', path: '/account-edit' },
+  ];
+
+  // ユーザーが「管理者」の場合のみ、管理者専用画面のメニューを先頭または末尾に滑り込ませる
+  if (userRole.value === 1) items.push({ label: '管理者画面', path: '/admin' }); // 将来用
+
+  // 最後に「ログアウト」ボタンを無条件で末尾に追加
+  items.push({ label: 'ログアウト', path: '/login', action: 'logout' });
+
+  return items;
+});
+
+// 画面遷移・アクションのハンドリング
+const navigate = (path, action) => {
+  if (action === 'logout') {
+    // ログアウト処理
+    if (confirm('ログアウトしますか？')) {
+      localStorage.removeItem('user');
+      router.push('/login');
+    }
+  } else {
+    // 通常の画面遷移
+    router.push(path);
+  }
+  isMenuOpen.value = false; // メニューを閉じる
+};
+
+const goHome = () => {
+  router.push('/dashboard');
 };
 </script>
 
 <style scoped>
+/* ヘッダー全体のスタイル固定設定 */
 .app-header {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 60px;
-  background-color: #2c3e50;
+  background-color: #343a40;
   color: white;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   padding: 0 20px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  z-index: 1000;
   box-sizing: border-box;
+  z-index: 1000;
 }
-
-.header-title {
-  font-size: 1.2rem;
-  font-weight: bold;
+.header-brand {
   cursor: pointer;
+  font-weight: bold;
+  font-size: 1.2rem;
 }
 
-/* ハンバーガーボタンのスタイル */
-.hamburger-btn {
+/* ハンバーガーボタンのスタイリング */
+.menu-trigger {
   background: none;
   border: none;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
   width: 30px;
-  height: 20px;
-  padding: 0;
+  height: 24px;
+  position: relative;
+  cursor: pointer;
 }
-
-.bar {
+.menu-trigger span {
   display: block;
-  width: 100%;
-  height: 3px;
-  background-color: white;
-  border-radius: 2px;
-  transition: all 0.3s ease;
-}
-
-/* メニューが開いている時の三本線の変形（X印にする演出） */
-.hamburger-btn.is-open .bar:nth-child(1) {
-  transform: translateY(8px) rotate(45deg);
-}
-.hamburger-btn.is-open .bar:nth-child(2) {
-  opacity: 0;
-}
-.hamburger-btn.is-open .bar:nth-child(3) {
-  transform: translateY(-9px) rotate(-45deg);
-}
-
-/* ドロップダウンメニューのスタイル */
-.dropdown-menu {
   position: absolute;
+  width: 100%;
+  height: 2px;
+  background-color: white;
+  left: 0;
+  transition: all 0.3s;
+}
+.menu-trigger span:nth-child(1) { top: 0; }
+.menu-trigger span:nth-child(2) { top: 11px; }
+.menu-trigger span:nth-child(3) { top: 22px; }
+
+/* メニュー展開時の三本線の変形アニメーション */
+.menu-trigger.is-active span:nth-child(1) { transform: translateY(11px) rotate(45deg); }
+.menu-trigger.is-active span:nth-child(2) { opacity: 0; }
+.menu-trigger.is-active span:nth-child(3) { transform: translateY(-11px) rotate(-45deg); }
+
+/* ドロワーメニュー */
+.nav-menu {
+  position: fixed;
   top: 60px;
   right: 0;
-  width: 250px;
-  background-color: #34495e;
-  box-shadow: -2px 4px 10px rgba(0,0,0,0.3);
-  border-bottom-left-radius: 8px;
+  width: 260px;
+  height: calc(100vh - 60px);
+  background-color: #ffffff;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.15);
+  padding: 20px;
+  box-sizing: border-box;
 }
-
-.dropdown-menu ul {
+.menu-user-info {
+  border-bottom: 1px solid #dee2e6;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+}
+.user-name {
+  color: #333;
+  font-weight: bold;
+  margin: 0 0 5px 0;
+}
+.badge-admin {
+  background-color: #dc3545;
+  color: white;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.menu-list {
   list-style: none;
+  padding: 0;
   margin: 0;
-  padding: 10px 0;
 }
-
-.dropdown-menu li a {
-  display: block;
-  padding: 15px 20px;
-  color: #ecf0f1;
-  text-decoration: none;
+.menu-item {
+  margin-bottom: 10px;
+}
+.menu-item button {
+  width: 100%;
+  text-align: left;
+  padding: 12px 15px;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: #495057;
   cursor: pointer;
+  border-radius: 6px;
   transition: background 0.2s;
 }
-
-.dropdown-menu li a:hover {
-  background-color: #465c71;
+.menu-item button:hover {
+  background-color: #f8f9fa;
+  color: #007bff;
+}
+.menu-item button.btn-logout {
+  color: #dc3545;
+  border-top: 1px solid #f1f3f5;
+  margin-top: 10px;
+  border-radius: 0;
+}
+.menu-item button.btn-logout:hover {
+  background-color: #fff5f5;
 }
 
-.menu-divider {
-  height: 1px;
-  background-color: #2c3e50;
-  margin: 5px 0;
-}
-
-.logout-link {
-  color: #e74c3c !important;
-}
-
-/* アニメーション効果 */
-.slide-enter-active, .slide-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-enter-from, .slide-leave-to {
-  transform: translateY(-10px);
-  opacity: 0;
-}
+/* スライドアニメーション */
+.slide-enter-active, .slide-leave-active { transition: transform 0.3s ease; }
+.slide-enter-from, .slide-leave-to { transform: translateX(100%); }
 </style>

@@ -1,27 +1,31 @@
 package com.appspace.backend.service;
 
-import com.appspace.backend.entity.UserAccount;
-import com.appspace.backend.repository.UserAccountRepository;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.appspace.backend.entity.UserAccount;
+import com.appspace.backend.repository.UserAccountRepository;
 
-import java.util.Optional;
-import java.util.List;  // ←インポートをお忘れなく
+import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor  // これをつけることで、repository を自動的に繋いでくれる（依存性の注入）コードが生成される
-@Transactional  // データベースの処理中にエラーが起きたら、処理を自動でキャンセル（ロールバック）してデータが壊れるのを防ぐ
+@RequiredArgsConstructor // これをつけることで、repository を自動的に繋いでくれる（依存性の注入）コードが生成される
+@Transactional // データベースの処理中にエラーが起きたら、処理を自動でキャンセル（ロールバック）してデータが壊れるのを防ぐ
 public class UserAccountService {
 
     private final UserAccountRepository repository;
-    
+
     @Autowired
     private PasswordEncoder passwordEncoder; // 直接 new せず、Springに管理されている部品をもらう
+
+    @Autowired
+    private Logger logger;
 
     /**
      * 新規ユーザー登録（パスワードをハッシュ化して保存）
@@ -51,7 +55,8 @@ public class UserAccountService {
      * ユーザー認証（ログインチェック）
      * ハッシュ化されたパスワード（$2a$10$...）と、ユーザーが入力した生のパスワード（mysecretpassword）を安全に照合するために設けている
      * このサービスを呼び出すための「ログイン窓口（エンドポイント）」は、UserAccountController.javaに設けられている
-     * @param userId ログインID（メールアドレス）
+     * 
+     * @param userId      ログインID（メールアドレス）
      * @param rawPassword 入力された生のパスワード
      * @return 認証成功時はユーザー情報、失敗時は空
      */
@@ -69,6 +74,7 @@ public class UserAccountService {
 
     /**
      * ログイン画面を経由してのログイン
+     * 
      * @param userId
      * @param rawPassword
      * @return
@@ -94,17 +100,18 @@ public class UserAccountService {
 
         // 2. パスワードのハッシュ化
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        
+
         // 3. デフォルト値のセット（必要に応じて）
         user.setIsAuth(0); // 一般ユーザーとして登録
         user.setQuitDemand(0); // 退会フラグはオフ
-        
+
         // 4. 保存 (accountIdとcreatedAtは@PrePersistで自動生成される)
         repository.save(user);
     }
 
     /**
      * アカウント情報の更新処理
+     * 
      * @param requestData フロントから届いた更新用データ（accountId, userName, passwordを含む）
      * @return 更新後のユーザー情報
      */
@@ -132,5 +139,42 @@ public class UserAccountService {
 
         // 5. データベースへ上書き保存（JPAの仕様により、既存レコードへのsaveはUPDATE文になります）
         return repository.save(existingUser);
+    }
+
+    /**
+     * アプリ起動時に初期管理者アカウントが存在しない場合、自動生成する処理
+     */
+    public void initializeAdminAccount() {
+        String adminEmail = "admin@example.com"; // 任意の管理用メールアドレス
+
+        // 既に管理者が存在するかチェック
+        if (!repository.findByUserId(adminEmail).isPresent()) {
+            UserAccount admin = new UserAccount();
+            admin.setUserName("統括管理者");
+            admin.setUserId(adminEmail);
+            // 初期パスワード（安全にハッシュ化します）
+            admin.setPassword(passwordEncoder.encode("admin1234"));
+            admin.setIsAuth(1); // 1: 管理者権限を付与
+            admin.setQuitDemand(0); // 退会申請はオフ
+            admin.setAbout("システム初期設定によって作成された最高管理者アカウントです。");
+
+            repository.save(admin);
+
+            logger.info("=== [System] 初期管理者アカウント(admin@example.com)を作成しました ===");
+        }
+    }
+
+    /**
+     * 退会申請（アカウント削除申請）の処理
+     * 
+     * @param accountId 対象のアカウントID
+     */
+    public void applyQuitDemand(String accountId) {
+        UserAccount user = repository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("ユーザーが見つかりません。"));
+
+        // 退会申請フラグを 1 (オン) に更新
+        user.setQuitDemand(1);
+        repository.save(user);
     }
 }
