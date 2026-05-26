@@ -190,4 +190,24 @@ public class UserAccountService {
         user.setQuitDemand(1);
         repository.save(user);
     }
+
+    /**
+     * 管理者による退会申請の承認処理（アカウントの削除）
+     * 
+     * @param accountId 削除対象のアカウントID
+     */
+    public void approveQuitDemand(String accountId) {
+        // 1. 対象のユーザーが本当に存在するか確認
+        UserAccount user = repository.findById(accountId)
+                .orElseThrow(() -> new RuntimeException("対象のユーザーが見つかりません。"));
+
+        // 2. セーフティガード：万が一、統括管理者を削除しようとした場合は阻止
+        if ("admin@example.com".equals(user.getUserId())) {
+            throw new RuntimeException("統括管理者アカウントは削除できません。");
+        }
+        // 3. データベースからアカウントを物理削除
+        repository.delete(user);
+        System.out.println("=== [System] 管理者によってアカウントが削除されました: " + user.getUserId() + " ===");
+    }
+
 }

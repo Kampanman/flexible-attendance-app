@@ -147,7 +147,7 @@ const handleUpdate = async () => {
   }
 };
 
-// ★【核心】2段階の確認ダイアログを経て実行する退会申請ロジック
+// 2段階の確認ダイアログを経て実行する退会申請ロジック
 const handleQuitDemand = async () => {
   errorMessage.value = '';
 

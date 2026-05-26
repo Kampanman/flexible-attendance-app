@@ -1,9 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import LoginForm from '../components/LoginForm.vue';
-import RegistForm from '../components/RegisterForm.vue';
+import AccountEdit from '../components/AccountEditView.vue';
+import AdminUserListView from '../components/AdminUserListView.vue';
 import AttendanceBoard from '../components/AttendanceBoard.vue';
 import DashboardView from '../components/DashboardView.vue';
-import AccountEdit from '../components/AccountEditView.vue';
+import LoginForm from '../components/LoginForm.vue';
+import RegistForm from '../components/RegisterForm.vue';
 
 const routes = [
   { path: '/login', component: LoginForm },
@@ -11,6 +12,7 @@ const routes = [
   { path: '/attendance', component: AttendanceBoard },
   { path: '/dashboard', component: DashboardView },
   { path: '/account-edit', component: AccountEdit },
+  { path: '/admin', component: AdminUserListView },
   { path: '/', redirect: '/login' } // 初期アクセスはログインへ
 ];
 

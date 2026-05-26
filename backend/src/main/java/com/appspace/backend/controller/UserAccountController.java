@@ -6,7 +6,9 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -121,6 +123,37 @@ public class UserAccountController {
             return ResponseEntity.ok("アカウント削除申請を受け付けました。");
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("申請に失敗しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 管理者用：すべてのアカウント一覧を取得するエンドポイント
+     * GET http://localhost:8080/api/users/admin/list
+     */
+    @GetMapping("/admin/list")
+    public ResponseEntity<List<UserAccount>> getAdminUserList() {
+        // サービス層から全ユーザーを取得して返却
+        List<UserAccount> users = userService.findAll();
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * 管理者用：退会申請を承認（アカウント削除）するエンドポイント
+     * DELETE http://localhost:8080/api/users/approve-quit/{accountId}
+     */
+    @DeleteMapping("/approve-quit/{accountId}")
+    public ResponseEntity<String> approveQuit(@PathVariable String accountId) {
+        try {
+            logger.info("=== 退会承認リクエストを受信 ===");
+            logger.info("   対象accountId: {}", accountId);
+
+            // サービス層の削除処理を呼び出し
+            userService.approveQuitDemand(accountId);
+
+            return ResponseEntity.ok("退会申請を承認し、アカウントを削除しました。");
+        } catch (RuntimeException e) {
+            // エラー時は 400 Bad Request を返却
+            return ResponseEntity.badRequest().body("承認処理に失敗しました: " + e.getMessage());
         }
     }
 
