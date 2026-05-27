@@ -42,7 +42,7 @@ public class EntryExitCalendarService {
     List<EntryExitCalendar> existingRecords = calendarRepository
         .findByRegistedAccountIdAndRecordDateBetweenOrderByRecordDateAsc(accountId, startDate, endDate);
 
-    // 4. 【ここが職人技】1日から末日までの「完璧な1か月分のリスト」を入れる器を用意します
+    // 4. 1日から末日までの「完璧な1か月分のリスト」を入れる器を用意します
     List<EntryExitCalendar> fullMonthCalendar = new ArrayList<>();
 
     // 5. 1日から末日 まで1日ずつループを回します

@@ -38,7 +38,8 @@ public class AttendanceEditController {
       @RequestParam String accountId,
       @RequestParam String yearMonth) {
     try {
-      // サービス職人に依頼して、完璧な1か月分リストを作ってもらいます
+      // 1か月分リストの生成
+      logger.info("accountId: {}, yearMonth: {}", accountId, yearMonth);
       List<EntryExitCalendar> list = calendarService.getMonthlyCalendar(accountId, yearMonth);
       return ResponseEntity.ok(list);
     } catch (Exception e) {

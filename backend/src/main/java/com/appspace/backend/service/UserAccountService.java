@@ -207,7 +207,7 @@ public class UserAccountService {
         }
         // 3. データベースからアカウントを物理削除
         repository.delete(user);
-        System.out.println("=== [System] 管理者によってアカウントが削除されました: " + user.getUserId() + " ===");
+        logger.info("=== [System] 管理者によってアカウントが削除されました: {} ===", user.getUserId());
     }
 
 }

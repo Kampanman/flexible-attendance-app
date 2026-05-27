@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import AccountEdit from '../components/AccountEditView.vue';
+import AdminAttendanceApproval from '../components/AdminAttendanceApprovalView.vue';
 import AdminUserListView from '../components/AdminUserListView.vue';
 import AttendanceBoard from '../components/AttendanceBoard.vue';
 import AttendanceEdit from '../components/AttendanceEditView.vue';
@@ -15,6 +16,7 @@ const routes = [
   { path: '/dashboard', component: DashboardView },
   { path: '/account-edit', component: AccountEdit },
   { path: '/admin', component: AdminUserListView },
+  { path: '/admin/approval', component: AdminAttendanceApproval },
   { path: '/', redirect: '/login' } // 初期アクセスはログインへ
 ];
 

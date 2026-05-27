@@ -22,4 +22,7 @@ public interface EntryExitCalendarRepository extends JpaRepository<EntryExitCale
    * 特定ユーザーの、特定の日付のレコードを1件取得する
    */
   Optional<EntryExitCalendar> findByRegistedAccountIdAndRecordDate(String accountId, LocalDate recordDate);
+
+  // 管理者用：日本全国の全ユーザーの中から、「時刻修正申請中（isTimechangeDemand = 1）」の行だけを全て取ってくる命令
+  List<EntryExitCalendar> findByIsTimechangeDemandOrderByRecordDateAsc(int isTimechangeDemand);
 }

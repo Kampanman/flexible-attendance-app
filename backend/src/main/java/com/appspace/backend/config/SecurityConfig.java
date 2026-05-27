@@ -40,6 +40,7 @@ public class SecurityConfig {
                                 "/api/system/**",
                                 "/api/attendance/**",
                                 "/api/attendance/history/**",
+                                "/api/admin/attendance/**",
                                 "/api/dashboard/**")
                         .permitAll()
                         .anyRequest().authenticated());
