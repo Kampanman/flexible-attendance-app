@@ -33,7 +33,7 @@
         <button @click="navigateTo('/schedule-demand')" class="btn-menu">
           予定申請
         </button>
-        <button @click="navigateTo('/timechange-demand')" class="btn-menu">
+        <button @click="navigateTo('/attendance-edit')" class="btn-menu">
           打刻内容編集申請
         </button>
         <button @click="navigateTo('/account-edit')" class="btn-menu">
@@ -50,9 +50,9 @@
 </template>
 
 <script setup>
-  import { ref, onMounted } from 'vue';
-  import { useRouter } from 'vue-router';
-  import apiClient from '../api.js';
+  import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import apiClient from '../api.js';
 
   const router = useRouter();
   const announcements = ref([]);

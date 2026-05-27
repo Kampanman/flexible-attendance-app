@@ -66,8 +66,8 @@ const menuItems = computed(() => {
   const items = [
     { label: 'ダッシュボード', path: '/dashboard' },
     { label: '打刻画面', path: '/attendance' },
-    { label: '予定申請', path: '/schedule-request' },      // パスは既存の定義に合わせてください
-    { label: '打刻内容編集申請', path: '/edit-request' }, // パスは既存の定義に合わせてください
+    { label: '予定申請', path: '/schedule-request' },
+    { label: '打刻内容編集申請', path: '/attendance-edit' },
     { label: 'アカウント情報編集', path: '/account-edit' },
   ];
 

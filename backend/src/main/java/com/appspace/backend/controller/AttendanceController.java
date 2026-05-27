@@ -1,14 +1,23 @@
 package com.appspace.backend.controller;
 
-import com.appspace.backend.entity.AttendanceRecord;
-import com.appspace.backend.service.AttendanceRecordService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.appspace.backend.entity.AttendanceRecord;
+import com.appspace.backend.service.AttendanceRecordService;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/attendance")
@@ -55,9 +64,8 @@ public class AttendanceController {
      */
     @GetMapping("/status")
     public ResponseEntity<String> getStatus(@RequestParam String accountId) {
-        String status = attendanceService.getCurrentStatus(accountId);
         String change_status = attendanceService.getAttendanceStatus(accountId);
-        
+
         // 文字列をそのまま返すとJSONとして扱いにくいため、シンプルなテキストで返します
         return ResponseEntity.ok(change_status);
     }
@@ -75,6 +83,7 @@ public class AttendanceController {
 
     /**
      * 打刻リクエストを受け取ってDBに保存するメソッド
+     * 
      * @param request
      * @return
      */
@@ -91,4 +100,5 @@ public class AttendanceController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("打刻失敗: " + e.getMessage());
         }
     }
+
 }

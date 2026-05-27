@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/h2-console/**",
                                 "/api/users/**",
+                                "/api/system/**",
                                 "/api/attendance/**",
                                 "/api/attendance/history/**",
                                 "/api/dashboard/**")

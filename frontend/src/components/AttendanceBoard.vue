@@ -1,8 +1,9 @@
 <template>
   <div class="attendance-board">
-
-    <div class="attendance-board">
+    
+    <div class="attendance-header-box">
       <h3>ようこそ、{{ userName }} さん</h3>
+    </div>
 
     <div class="status-display">
       <p>現在の状態：
@@ -30,12 +31,11 @@
       </button>
     </div>
 
-    <div class="mode-switcher" v-if="status === 'CLOCKED_OUT'">
-      <button @click="currentMode = 'attendance'" :class="{ active: currentMode === 'attendance' }">勤怠モード</button>
-      <button @click="currentMode = 'room'" :class="{ active: currentMode === 'room' }">入退室モード</button>
-      <button @click="currentMode = 'session'" :class="{ active: currentMode === 'session' }">出席退席モード</button>
-    </div>
-
+    <div class="system-mode-indicator">
+      <span class="indicator-tag">アプリケーション稼働モード：</span>
+      <strong class="indicator-text">
+        {{ currentMode === 'attendance' ? '勤怠モード' : currentMode === 'room' ? '入退室モード' : '出席退席モード' }}
+      </strong>
     </div>
 
     <hr class="divider">
@@ -56,53 +56,51 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import apiClient from '../api';
-const history = ref([]);
 
-// ローカルストレージから取得したIDを保持するリアクティブ変数
+const history = ref([]);
 const loggedInAccountId = ref('');
 const userName = ref('');
 
-// 現在の表示モードを管理する変数（初期値を 'attendance' に設定）
+// 💡 変更点：初期値は 'attendance' とし、文字列で管理する構造を維持します
 const currentMode = ref('attendance'); 
-
-// 履歴データを格納する配列
 const attendanceHistory = ref([]); 
 
-/**
- * バックエンドから打刻履歴を取得する関数
- * @param {String} id - ログインユーザーのaccountId
- */
+// モードの数値(0, 1, 2)と、既存の文字列キー('attendance', 'room', 'session')をマッピングする辞書
+const modeMapping = {
+  0: 'attendance', // 勤怠モード
+  1: 'room',       // 入退室モード
+  2: 'session'     // 出席退席モード
+};
+
+// 💡 追加：バックエンドから最新の一括打刻モードを取得する関数
+const fetchSystemMode = async () => {
+  try {
+    // 先ほどJava側で作成した GET /api/system/mode を呼び出す
+    const response = await apiClient.get('/system/mode');
+    const modeNumber = response.data.mode; // 0, 1, 2 が返ってくる
+    
+    // 数値を対応する文字列キーに変換して、currentModeに格納
+    currentMode.value = modeMapping[modeNumber] || 'attendance';
+    console.log(`[System] 最新の打刻モードを自動適用しました: ${currentMode.value}`);
+  } catch (error) {
+    console.error('打刻モードの取得に失敗しました。デフォルト（勤怠）で動作します:', error);
+  }
+};
+
+// バックエンドから打刻履歴を取得する関数
 const fetchAttendanceHistory = async (id) => {
   if (!id) return;
   try {
-    // バックエンドの履歴取得API（GET /api/attendance/history/{accountId}）を叩く
     const response = await apiClient.get(`/attendance/history/${id}`);
-    
-    // 取得したデータを履歴配列にセットする
     attendanceHistory.value = response.data;
   } catch (error) {
     console.error('打刻履歴の取得に失敗しました:', error);
   }
 };
 
-onMounted(() => {
-  // LoginForm.vue が保存した 'user' データを読み出す
-  const userData = localStorage.getItem('user');
-  if (userData) {
-    const user = JSON.parse(userData);
-    loggedInAccountId.value = user.accountId; // ★これで正しいIDがセットされます
-    userName.value = user.userName;
-  } else {
-    console.error("ユーザー情報が見つかりません。");
-  }
-
-  // 既存の初期化処理（履歴の取得など）があれば、loggedInAccountId.value を使って呼び出す
-  if (loggedInAccountId.value) fetchAttendanceHistory(loggedInAccountId.value);
-});
-
-// モードに応じたラベルの定義
+// モードに応じた各種ラベルの定義（既存の定義をそのまま活用）
 const labelSettings = {
   attendance: { inActive: '勤務中', outActive: '未出勤', inAction: '出勤', outAction: '退勤' },
   room:       { inActive: '入室中', outActive: '退室済', inAction: '入室', outAction: '退室' },
@@ -114,20 +112,14 @@ const currentLabels = computed(() => {
   return labelSettings[currentMode.value] || labelSettings.attendance;
 });
 
-// 現在のモード（propsから受け取る。デフォルトは 'attendance'）
-const labels = computed(() => labelSettings[props.mode || 'attendance']);
-
 const status = ref('CLOCKED_OUT');
-
-// 現在の就業ステータス
-const currentStatus = ref(0)
 
 // ステータス取得API
 const fetchStatus = async () => {
   if (!loggedInAccountId.value) return;
   try {
     const response = await apiClient.get(`/attendance/status?accountId=${loggedInAccountId.value}`);
-    status.value = response.data; // バックエンドから "CLOCKED_IN" または "CLOCKED_OUT" が届く
+    status.value = response.data; 
   } catch (error) {
     console.error('ステータス取得失敗', error);
   }
@@ -137,8 +129,6 @@ const fetchStatus = async () => {
 const fetchHistory = async () => {
   try {
     const response = await apiClient.get(`/attendance/history/${loggedInAccountId.value}`);
-    console.log("バックエンドから届いた生の履歴データ:", response.data);
-
     history.value = response.data;
   } catch (error) {
     console.error('履歴取得失敗', error);
@@ -147,20 +137,15 @@ const fetchHistory = async () => {
 
 // 履歴をペアリングして直近10件分を返すロジック
 const pairedHistory = computed(() => {
-  // historyが存在しない、または空の場合は即座に空配列を返す
-  // if (!props.history || !Array.isArray(props.history)) return [];
-  
-  // props.history ではなく、history.valueを見に行くようにします
   if (!history.value || !Array.isArray(history.value)) return [];
 
   const result = [];
-  const sortedHistory = [...history.value].reverse(); // 存在する時だけスプレッド演算子でコピーを作る
+  const sortedHistory = [...history.value].reverse();
   
   for (let i = 0; i < sortedHistory.length; i++) {
     const record = sortedHistory[i];
 
     if (record.type === 'clock-in') {
-      // 次のレコードが clock-out かつ同じペアになるべきものかチェック
       const nextRecord = sortedHistory[i + 1];
       if (nextRecord && nextRecord.type === 'clock-out') {
         result.push({
@@ -168,9 +153,8 @@ const pairedHistory = computed(() => {
           inTime: formatTime(record.createdAt),
           outTime: formatTime(nextRecord.createdAt)
         });
-        i++; // 退室レコード分をスキップ
+        i++; 
       } else {
-        // 退室がない場合は進行中として表示
         result.push({
           date: formatDate(record.createdAt),
           inTime: formatTime(record.createdAt),
@@ -179,114 +163,104 @@ const pairedHistory = computed(() => {
       }
     }
   }
-
-  // 最新の10件を返す（再び最新が上に来るように逆転させる）
   return result.reverse().slice(0, 10);
 });
 
-// emit の定義
 const emit = defineEmits(['refresh-history']);
 
 // 打刻処理
 const punch = async (type) => {
   try {
-    // 1. クエリパラメータ形式から、JSON ボディ形式に変更
-    // バックエンドの @RequestBody Map<String, String> request と一致させます
-    console.log("accountId: " + loggedInAccountId.value + ", type: " + type);
     await apiClient.post('/attendance/punch', {
-      accountId: loggedInAccountId.value, // route設定後はpropsではなく、ローカルストレージから復元した変数を指定
-      type: type  // 'CLOCK_IN' または 'CLOCK_OUT'
+      accountId: loggedInAccountId.value,
+      type: type  
     });
 
-    // 2. 打刻が成功したら、ステータスと履歴を更新
-    // fetchStatus は「現在の状態：入室中」などの表示更新
-    // fetchHistory は「最近の履歴」リストの更新を担当します
     await fetchStatus();
     await fetchHistory();
-
-    // 3. 親（App.vue）側でも履歴を管理している場合は、イベントを飛ばす
-    // ※もしApp.vueのattendanceHistoryを更新したい場合に有効です
     emit('refresh-history');
     
-    // 打刻が成功したので、最新の履歴を再取得して画面をパッと更新する！
     fetchAttendanceHistory(loggedInAccountId.value);
-    
-    // ステータス（現在入室中か退室中か）の再取得関数があればそれも呼ぶ
-    if (typeof fetchStatus === 'function') fetchStatus();
-
-    // 成功のフィードバック（任意）
-    console.log(`${type} 成功`);
   } catch (error) {
     console.error('打刻エラー:', error);
     alert('打刻に失敗しました。');
   }
 };
 
-// 日時フォーマット用の補助関数
 const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('ja-JP');
 const formatTime = (dateStr) => new Date(dateStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-onMounted(() => {
-  fetchStatus();
-  fetchHistory(); // 画面が開いたときに履歴も読み込む
+// 💡 画面立ち上げ時の処理をブラッシュアップ
+onMounted(async () => {
+  // 1. まずは管理者が指定した「最新のモード」を裏でサッと取得
+  await fetchSystemMode();
+
+  // 2. ユーザー情報の復元と、ステータス・履歴の読み込み
+  const userData = localStorage.getItem('user');
+  if (userData) {
+    const user = JSON.parse(userData);
+    loggedInAccountId.value = user.accountId;
+    userName.value = user.userName;
+    
+    // ユーザーに紐づくデータをロード
+    fetchStatus();
+    fetchHistory();
+    fetchAttendanceHistory(loggedInAccountId.value);
+  } else {
+    console.error("ユーザー情報が見つかりません。");
+  }
 });
 </script>
 
 <style scoped>
-.attendance-board { text-align: center; margin-top: 50px; }
-.status-badge { display: inline-block; padding: 10px 20px; border-radius: 20px; margin-bottom: 20px; font-weight: bold; }
-.CLOCKED_IN { background-color: #e3f2fd; color: #1976d2; }
-.CLOCKED_OUT { background-color: #f5f5f5; color: #616161; }
-.btn-in { background-color: #4caf50; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 5px; cursor: pointer; }
-.btn-out { background-color: #f44336; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 5px; cursor: pointer; }
-.label { color: #aaa; font-size: 0.9em; }
-.time { min-width: 80px; }
-.separator { margin: 0 5px; color: #888; }
-.history-list { list-style: none; padding: 0; margin: 20px 0; }
+.attendance-board { text-align: center; margin-top: 50px; max-width: 600px; margin-left: auto; margin-right: auto; padding: 20px; }
+.attendance-header-box { margin-bottom: 20px; }
+.status-display { margin-bottom: 25px; font-size: 1.1rem; font-weight: bold; }
+.status-in { background-color: #e3f2fd; color: #1976d2; padding: 6px 16px; border-radius: 20px; }
+.status-out { background-color: #f5f5f5; color: #616161; padding: 6px 16px; border-radius: 20px; }
+
+.punch-actions { margin-bottom: 30px; }
+.btn-in { background-color: #4caf50; color: white; padding: 18px 40px; font-size: 1.4rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(76,175,80,0.2); transition: background-color 0.2s; }
+.btn-in:hover { background-color: #43a047; }
+.btn-out { background-color: #f44336; color: white; padding: 18px 40px; font-size: 1.4rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(244,67,54,0.2); transition: background-color 0.2s; }
+.btn-out:hover { background-color: #e53935; }
+
+/* 💡 追加：現在のシステム稼働モード案内用インジケーターの装飾 */
+.system-mode-indicator {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 10px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+.indicator-tag {
+  color: #6c757d;
+  font-size: 0.8rem;
+  background-color: #e9ecef;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.indicator-text {
+  color: #212529;
+}
+
+.divider { margin: 30px 0; border: none; border-top: 1px solid #e9ecef; }
+.history-section h3 { color: #495057; margin-bottom: 15px; }
+.history-list { list-style: none; padding: 0; margin: 0; }
 .history-item {
   display: flex;
   justify-content: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid #444; /* 各行に薄い区切り線 */
-  font-family: monospace; /* 時間の数字を揃えやすくするため */
-}
-
-/* モード切り替えボタンのコンテナ（親要素） */
-.mode-switcher {
-  display: flex;            /* ボタンを横並びにする */
-  justify-content: center;  /* 中央寄せにする */
-  gap: 12px;                /* ★ボタンとボタンの間の余白（隙間）を適度にとる */
-  margin-top: 25px;         /* 打刻エリアとの上下のディスタンス */
-  margin-bottom: 20px;
-  flex-wrap: wrap;          /* 画面幅が狭いときは自動で綺麗に折り返すようにする安全策 */
-}
-
-/* モード切り替えボタン単体のデザイン */
-.mode-switcher button {
-  background-color: #f8f9fa; /* 普段は主張しすぎない上品な薄いグレー */
-  color: #495057;
-  border: 1px solid #ced4da;
-  padding: 10px 16px;        /* ★上下10px、左右16pxの内側余白をとり、押しやすい大きさに */
-  border-radius: 6px;        /* 角を少し丸めてモダンな印象に */
+  gap: 15px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f3f5;
+  font-family: monospace;
   font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease; /* マウスを乗せた時やクリックした時の変化を滑らかにする */
+  color: #495057;
 }
-
-/* マウスホバー時のエフェクト */
-.mode-switcher button:hover {
-  background-color: #e9ecef;
-  border-color: #adb5bd;
-}
-
-/* 現在アクティブ（選択中）なモードのボタンを強調するスタイル */
-/* もしHTML側で「:class="{ active: currentMode === 'attendance' }"」のように制御する場合に輝きます */
-.mode-switcher button.active {
-  background-color: #007bff;
-  color: white;
-  border-color: #007bff;
-  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
-}
+.separator { color: #ced4da; }
 </style>
