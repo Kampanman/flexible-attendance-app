@@ -15,7 +15,7 @@
       </div>
 
       <div class="form-group">
-        <label for="userName">新しいユーザー名</label>
+        <label for="userName">ユーザー名</label>
         <input type="text" id="userName" v-model="userName" required placeholder="ユーザー名を入力" />
       </div>
 
@@ -27,6 +27,11 @@
       <div class="form-group">
         <label for="passwordConfirm">新しいパスワード（確認）</label>
         <input type="password" id="passwordConfirm" v-model="passwordConfirm" placeholder="もう一度入力" />
+      </div>
+
+      <div class="form-group">
+        <label for="about">フリーコメント</label>
+        <textarea id="about" v-model="about" placeholder="コメント事項がある場合は記入してください"></textarea>
       </div>
 
       <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
@@ -66,6 +71,7 @@ const userName = ref('');
 const password = ref('');
 const passwordConfirm = ref('');
 const quitDemand = ref(0); // 退会申請フラグの状態を管理する変数
+const about = ref('');
 
 const errorMessage = ref('');
 const successMessage = ref(''); // 通知ボックス用の動的メッセージ
@@ -82,6 +88,7 @@ onMounted(() => {
     accountId.value = user.accountId;
     userId.value = user.userId;
     userName.value = user.userName;
+    about.value = user.about;
     quitDemand.value = user.quitDemand || 0; // 初期状態のフラグをセット
   } else {
     router.push('/login');
@@ -132,7 +139,8 @@ const handleUpdate = async () => {
     await apiClient.put('/users/update', {
       accountId: accountId.value,
       userName: userName.value,
-      password: password.value || null
+      password: password.value || null,
+      about: about.value || null
     });
 
     startLogoutTimer('アカウント情報を更新しました。');
@@ -204,12 +212,18 @@ label {
   font-weight: bold;
   color: #495057;
 }
-input {
+input, textarea {
   width: 100%;
   padding: 10px;
   border: 1px solid #ced4da;
   border-radius: 4px;
   box-sizing: border-box;
+}
+textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
 }
 .input-disabled {
   background-color: #e9ecef;

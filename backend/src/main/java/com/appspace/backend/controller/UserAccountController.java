@@ -46,8 +46,7 @@ public class UserAccountController {
     public ResponseEntity<String> register(@RequestBody UserAccount account) {
         // @RequestBodyで、届いたJSONデータ（ユーザー名やパスワードなど）を、自動的に UserAccount オブジェクトに変換して取り込む
         try {
-            UserAccount savedAccount = userService.registerUser(account);
-            // return ResponseEntity.ok(savedAccount);
+            userService.registerUser(account);
             String completeMessage = "ユーザー登録が完了しました";
             return ResponseEntity.ok(completeMessage);
         } catch (RuntimeException e) {

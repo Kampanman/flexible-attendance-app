@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/api/attendance/**",
                                 "/api/attendance/history/**",
                                 "/api/admin/attendance/**",
+                                "/api/admin/announcements/**",
                                 "/api/dashboard/**")
                         .permitAll()
                         .anyRequest().authenticated());

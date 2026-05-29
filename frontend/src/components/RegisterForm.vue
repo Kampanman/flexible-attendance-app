@@ -18,9 +18,15 @@
           <label for="password">パスワード</label>
           <input id="password" v-model="password" type="password" :disabled="isRedirecting" required />
         </div>
+
         <div class="form-group">
           <label for="passwordConfirm">パスワード (確認用)</label>
           <input id="passwordConfirm" v-model="passwordConfirm" type="password" :disabled="isRedirecting" required />
+        </div>
+
+        <div class="form-group">
+          <label for="about">フリーコメント</label>
+          <textarea id="about" v-model="about" placeholder="コメント事項がある場合は記入してください"></textarea>
         </div>
 
         <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
@@ -53,8 +59,9 @@ const userId = ref('');
 const password = ref('');
 const passwordConfirm = ref('');
 const errorMessage = ref('');
+const about = ref('');
 
-// ★新しく追加する状態変数
+// 状態変数
 const successMessage = ref('');   // 成功メッセージ用
 const isRedirecting = ref(false); // 3秒間のリダイレクト中かどうかを判定
 
@@ -74,7 +81,8 @@ const handleRegister = async () => {
       body: JSON.stringify({
         userName: userName.value,
         userId: userId.value,
-        password: password.value
+        password: password.value,
+        about: about.value || null,
       })
     });
 
@@ -155,6 +163,21 @@ const resetForm = () => {
   border-radius: 4px;
   border: 1px solid #ccc;
   font-size: 1rem;
+}
+
+input, textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
 }
 
 /* 入力不可状態（リダイレクト中）の入力欄の見た目 */

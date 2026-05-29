@@ -24,6 +24,12 @@
       >
         打刻モード一括制御
       </button>
+      <button 
+        @click="currentTab = 'announcements'" 
+        :class="['tab-btn', { active: currentTab === 'announcements' }]"
+      >
+        お知らせ管理
+      </button>
     </div>
     <div class="tab-content">
       
@@ -75,6 +81,10 @@
         </div>
       </div>
 
+      <div v-if="currentTab === 'announcements'">
+        <AdminAnnouncementPanel />
+      </div>
+
     </div>
   </div>
 </template>
@@ -84,6 +94,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../api';
 // コンポーネントをインポート
+import AdminAnnouncementPanel from '../components/AdminAnnouncementPanel.vue';
 import AdminAttendanceApprovalView from '../components/AdminAttendanceApprovalView.vue';
 import AdminUserList from '../components/AdminUserList.vue';
 

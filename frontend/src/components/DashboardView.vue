@@ -132,7 +132,7 @@ import apiClient from '../api.js';
 
   /* 上段: お知らせスタイル */
   .announcement-section {
-    background-color: #f8f9fa;
+    background-color: #91c4f8;
     padding: 15px;
     border-radius: 8px;
     border-left: 5px solid #3498db;
