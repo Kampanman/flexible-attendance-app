@@ -1,6 +1,7 @@
 package com.appspace.backend.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.appspace.backend.dto.TimeChangeRequest;
 import com.appspace.backend.entity.EntryExitCalendar;
 import com.appspace.backend.service.EntryExitCalendarService;
 
@@ -39,7 +39,7 @@ public class AttendanceEditController {
       @RequestParam String yearMonth) {
     try {
       // 1か月分リストの生成
-      logger.info("accountId: {}, yearMonth: {}", accountId, yearMonth);
+      logger.info("[getMonthlyList] accountId: {}, yearMonth: {}", accountId, yearMonth);
       List<EntryExitCalendar> list = calendarService.getMonthlyCalendar(accountId, yearMonth);
       return ResponseEntity.ok(list);
     } catch (Exception e) {
@@ -52,40 +52,93 @@ public class AttendanceEditController {
    * POST http://localhost:8080/api/attendance/request-edit
    */
   @PostMapping("/request-edit")
-  public ResponseEntity<String> requestEdit(@RequestBody TimeChangeRequest request) {
-
-    // 【二重バリデーション】仕様書要件に基づく厳格なバックエンドチェック
+  public ResponseEntity<String> requestEdit(@RequestBody com.appspace.backend.dto.TimeChangeRequest request) {
+    // 【二重バリデーション】仕様書要件に基づくバックエンドチェック
 
     // 1. 備考（修正理由）の空っぽチェック
     if (request.getReason() == null || request.getReason().trim().isEmpty()) {
       return ResponseEntity.badRequest().body("【却下】修正理由（備考）の入力は必須です。");
     }
 
-    // 2. 時刻が正しい形式（hh:mm:ss）になっているか正規表現を使ってチェック
-    // 「数字2桁 : 数字2桁 : 数字2桁」の形、または未打刻を埋めるハイフン「-」のみ許容
+    // 2. 日付判定の準備（今日の日付を取得）
+    java.time.LocalDate today = java.time.LocalDate.now();
+    java.time.LocalDate targetDate = request.getRecordDate();
+    boolean isToday = targetDate.equals(today);
+
+    // 3. 時刻形式チェック用の正規表現 (hh:mm:ss)
     String timeRegex = "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$";
 
-    if (!request.getTargetEntryTime().equals("-") && !request.getTargetEntryTime().matches(timeRegex)) {
+    // --- Entry（出勤）時刻のチェック ---
+    // 当日・過去問わず、Entry時刻は必須とします（未入力・空欄・ハイフンは不可）
+    if (request.getTargetEntryTime() == null ||
+        request.getTargetEntryTime().equals("-") ||
+        request.getTargetEntryTime().trim().isEmpty()) {
+      return ResponseEntity.badRequest().body("【却下】出勤時刻(Entry)を入力してください。");
+    }
+    if (!request.getTargetEntryTime().matches(timeRegex)) {
       return ResponseEntity.badRequest().body("【却下】Entry時刻の形式が不正です。(hh:mm:ssで入力してください)");
     }
-    if (!request.getTargetExitTime().equals("-") && !request.getTargetExitTime().matches(timeRegex)) {
-      return ResponseEntity.badRequest().body("【却下】Exit時刻の形式が不正です。(hh:mm:ssで入力してください)");
+
+    // --- Exit（退勤）時刻のチェック ---
+    String exitTime = request.getTargetExitTime();
+
+    // 入力値が空欄、もしくはフロントからハイフン「-」で送られてきた場合、扱いやすいように「-」に統一します
+    if (exitTime == null || exitTime.trim().isEmpty()) {
+      exitTime = "-";
+    }
+
+    if (isToday) {
+      // 当日の場合: 退勤時刻が「-」であっても許容（出勤中につき退勤打刻がまだ無いため）
+      if (!exitTime.equals("-") && !exitTime.matches(timeRegex)) {
+        return ResponseEntity.badRequest().body("【却下】当日の退勤時刻(Exit)の形式が不正です。");
+      }
+    } else {
+      // 前日以前（過去）の場合: 退勤時刻「-」は不可。必ず有効な時刻形式が必要
+      if (exitTime.equals("-")) {
+        return ResponseEntity.badRequest().body("【却下】過去の日付の申請には、退勤時刻(Exit)の入力も必須です。");
+      }
+      if (!exitTime.matches(timeRegex)) {
+        return ResponseEntity.badRequest().body("【却下】Exit時刻の形式が不正です。(hh:mm:ssで入力してください)");
+      }
     }
 
     try {
-      // すべてのチェックをクリアしたら、サービス層にDBへの書き込みを命じます
+      // 統一した変数（exitTime）をサービス層に手渡すように修正
       calendarService.requestTimeChange(
           request.getAccountId(),
           request.getRecordDate(),
           request.getTargetEntryTime(),
-          request.getTargetExitTime(),
+          exitTime, // 「-」または正しい時刻文字列
           request.getReason());
 
-      logger.info("=== [Controller] 修正申請の受付に成功しました ===");
+      System.out.println("=== [Controller] 修正申請の受付に成功しました ===");
       return ResponseEntity.ok("打刻内容の修正申請を提出しました。管理者の承認をお待ちください。");
 
     } catch (Exception e) {
       return ResponseEntity.internalServerError().body("申請処理中に重大なエラーが発生しました: " + e.getMessage());
+    }
+  }
+
+  /**
+   * 窓口3: ユーザーからの打刻修正申請の「取り消し」リクエストを受け付ける
+   * POST http://localhost:8080/api/attendance/cancel-edit
+   */
+  @PostMapping("/cancel-edit")
+  public ResponseEntity<String> cancelEdit(@RequestBody Map<String, Object> payload) {
+    String accountId = (String) payload.get("accountId");
+    String dateStr = (String) payload.get("recordDate");
+
+    if (accountId == null || dateStr == null) {
+      return ResponseEntity.badRequest().body("必要なパラメータが不足しています。");
+    }
+
+    try {
+      java.time.LocalDate recordDate = java.time.LocalDate.parse(dateStr);
+      logger.info("[cancelEdit] accountId:{}, recordDate:{}", accountId, recordDate);
+      calendarService.cancelTimeChangeRequest(accountId, recordDate);
+      return ResponseEntity.ok("申請を取り消しました。");
+    } catch (Exception e) {
+      return ResponseEntity.internalServerError().body("取り消し処理中にエラーが発生しました: " + e.getMessage());
     }
   }
 }

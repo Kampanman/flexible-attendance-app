@@ -36,9 +36,21 @@
             </td>
             
             <td>
-              <button @click="openEditForm(day)" class="btn-action-edit">
-                {{ day.isTimechangeDemand === 1 ? '再申請' : '編集申請' }}
-              </button>
+              <span v-if="isFutureDate(day.recordDate)" class="text-muted">不可</span>
+
+              <div v-else class="action-buttons-gap">
+                <button @click="openEditForm(day)" class="btn-action-edit">
+                  {{ day.isTimechangeDemand === 1 ? '再申請' : '編集申請' }}
+                </button>
+
+                <button 
+                  v-if="day.isTimechangeDemand === 1 && day.timechangeStatus === 0" 
+                  @click="cancelRequest(day)" 
+                  class="btn-action-cancel"
+                >
+                  取消
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -164,31 +176,67 @@ const closeForm = () => {
   selectedDay.value = null;
 };
 
-// 仕様書要件：フロントエンド側での厳格なバリデーション＆確認アラート
+// =================================================================
+// 日付判定用のユーティリティ関数群
+// =================================================================
+
+// 当日であるかを判定する
+const isToday = (dateStr) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  return dateStr === todayStr;
+};
+
+// 翌日以降（未来）であるかを判定する
+const isFutureDate = (dateStr) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  return dateStr > todayStr; // 文字列比較で yyyy-MM-dd の前後が判定できます
+};
+
+// =================================================================
+// 修正・追加：申請提出時のバリデーションロジック
+// =================================================================
 const submitRequest = async () => {
-  // 1. 備考欄の空チェック
+  const targetDate = selectedDay.value.recordDate;
+
+  // 1. 【共通】備考欄（修正理由）の空チェック
   if (!form.value.reason.trim()) {
     alert('修正理由（備考）を入力してください。');
     return;
   }
 
-  // 2. 時刻形式チェック (hh:mm:ss)
+  // 2. 【共通】時刻の簡易形式チェック（ハイフン、または hh:mm:ss 形式）
   const timeRegex = "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$";
-  if (!form.value.entryTime.match(timeRegex) || !form.value.exitTime.match(timeRegex)) {
-    alert('時刻は「hh:mm:ss」の形式（例: 09:00:00）で入力してください。');
-    return;
+  
+  // 3. 【日付の文脈に応じた厳格なバリデーション】
+  if (isToday(targetDate)) {
+    // 当日の場合: Entry時刻は必須、Exitは空（またはハイフン）でも許可
+    if (!form.value.entryTime.match(timeRegex)) {
+      alert('当日の申請には、正しい出勤時刻(Entry)の入力が必要です。');
+      return;
+    }
+    // 退勤が入力されている場合のみ形式チェック
+    if (form.value.exitTime.trim() == '') form.value.exitTime = '-';
+    if (form.value.exitTime !== '-' && !form.value.exitTime.match(timeRegex)) {
+      alert('退勤時刻(Exit)の形式が不正です。');
+      return;
+    }
+  } else {
+    // 前日以前（過去）の場合: Entry、Exit両方の入力が必須
+    if (!form.value.entryTime.match(timeRegex) || !form.value.exitTime.match(timeRegex)) {
+      alert('前日以前の申請を行うには、出勤(Entry)と退勤(Exit)の両方の時刻を入力してください。');
+      return;
+    }
   }
 
-  // 3. 仕様書要件：申請時は必ず確認アラートを表示する
+  // 確認アラートを表示
   if (!confirm('この内容で打刻内容の編集申請を提出してもよろしいですか？')) {
     return;
   }
 
   try {
-    // バックエンドの POST /api/attendance/request-edit へ送信
     await apiClient.post('/attendance/request-edit', {
       accountId: loggedInAccountId.value,
-      recordDate: selectedDay.value.recordDate,
+      recordDate: targetDate,
       targetEntryTime: form.value.entryTime,
       targetExitTime: form.value.exitTime,
       reason: form.value.reason
@@ -196,10 +244,33 @@ const submitRequest = async () => {
 
     alert('申請が正常に提出されました！');
     closeForm();
-    fetchMonthlyData(); // リストを最新状態に更新
+    fetchMonthlyData();
   } catch (error) {
     console.error('申請エラー:', error);
     alert(error.response?.data || '申請の提出に失敗しました。');
+  }
+};
+
+// =================================================================
+// 申請取り消し処理
+// =================================================================
+const cancelRequest = async (day) => {
+  if (!confirm(`${formatDate(day.recordDate)} の編集申請を取り消しますか？`)) {
+    return;
+  }
+
+  try {
+    // 後述するバックエンドの取消専用APIへ送信
+    await apiClient.post('/attendance/cancel-edit', {
+      accountId: loggedInAccountId.value,
+      recordDate: day.recordDate
+    });
+
+    alert('申請を取り消しました。');
+    fetchMonthlyData(); // リストを再読込
+  } catch (error) {
+    console.error('取消エラー:', error);
+    alert('申請の取り消しに失敗しました。');
   }
 };
 
@@ -409,4 +480,26 @@ onMounted(() => {
   cursor: pointer;
 }
 .btn-cancel:hover { background-color: #d5d5d5; }
+
+/* ボタンを横並びにするための隙間設定 */
+.action-buttons-gap {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* 取り消しボタンのデザイン */
+.btn-action-cancel {
+  background-color: #ffffff;
+  border: 1px solid #e53935;
+  color: #e53935;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+.btn-action-cancel:hover {
+  background-color: #ffebee;
+}
 </style>

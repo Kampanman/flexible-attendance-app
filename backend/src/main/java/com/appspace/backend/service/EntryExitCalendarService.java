@@ -5,7 +5,6 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +57,7 @@ public class EntryExitCalendarService {
         // すでにデータが存在すれば、それをそのままリストに採用！
         fullMonthCalendar.add(foundRecord.get());
       } else {
-        // 💡 まだ打刻データがない日（未出勤の日や未来の日）の場合、
+        // まだ打刻データがない日（未出勤の日や未来の日）の場合、
         // 画面で「空行」として表示できるように、その場で見映え用の空レコードを偽造してあげます
         EntryExitCalendar blankDay = new EntryExitCalendar();
         blankDay.setRecordDate(currentLoopDate);
@@ -76,45 +75,74 @@ public class EntryExitCalendarService {
   /**
    * 業務ロジック2: ユーザーからの打刻修正（編集）申請を処理する
    */
-  @Transactional // データの書き換えを安全に行うための宣言（エラーが起きたら自動で巻き戻す）
-  public void requestTimeChange(String accountId, LocalDate recordDate, String tmpEntry, String tmpExit,
+  @Transactional
+  public void requestTimeChange(String accountId, java.time.LocalDate recordDate, String tmpEntry, String tmpExit,
       String reason) {
 
-    // 1. まず、その日のレコードが既にDBにあるかどうかをピンポイント検索します
+    // 1. その日のレコードが既にDBにあるかどうかを検索
     Optional<EntryExitCalendar> existingOpt = calendarRepository
         .findByRegistedAccountIdAndRecordDate(accountId, recordDate);
 
     EntryExitCalendar targetRow;
 
     if (existingOpt.isPresent()) {
-      // すでに打刻データがある日なら、その既存データを書き換え対象にします
       targetRow = existingOpt.get();
     } else {
-      // 丸ごと押し忘れてデータが1件もない日の場合、新しく行を立ち上げます
+      // データが1件もない日の場合、新しく行を立ち上げる
       targetRow = new EntryExitCalendar();
-
-      // 仕様書通りのルール（登録日の yyyyMMddhhmmssss + UUID末尾4桁）で record_id を生成
       String timePart = java.time.LocalDateTime.now()
           .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-      String uuidPart = UUID.randomUUID().toString().substring(32); // 末尾4桁を取得
+      String uuidPart = java.util.UUID.randomUUID().toString().substring(32);
       targetRow.setRecordId("REC" + timePart + uuidPart);
 
       targetRow.setRecordDate(recordDate);
       targetRow.setRegistedAccountId(accountId);
-      targetRow.setEntryTime("-"); // 元の打刻時刻は空なのでハイフン
+      targetRow.setEntryTime("-");
       targetRow.setExitTime("-");
     }
 
-    // 2. 仕様書に指定された「申請中ステータス」の値をパチパチとセットします
-    targetRow.setTmpEntryTime(tmpEntry); // ユーザーが希望する新しいEntry時刻
-    targetRow.setTmpExitTime(tmpExit); // ユーザーが希望する新しいExit時刻
-    targetRow.setIsTimechangeDemand(1); // ★時刻修正申請中フラグを「1:申請中」にする
-    targetRow.setTimechangeStatus(0); // ★ステータスを「0:未承認」にする
-    targetRow.setReason(reason); // 修正の理由（備考）を格納
-    targetRow.setAdminComment(""); // 申請し直しに備えて管理者の過去コメントをクリア
+    // 2. 申請用の仮保存枠（tmp_xxx）に値をセット
+    targetRow.setTmpEntryTime(tmpEntry);
 
-    // 3. 翻訳窓口（リポジトリ）に「これで保存して！」と手渡します
+    // 調整：もし当日の申請で、退勤がまだおこなわれておらず、
+    // ユーザーもフォームの退勤欄を空（ハイフン）のまま申請してきた場合は、
+    // 既存の確定データ（無ければハイフン）の状態を優しく維持して仮保存します
+    if ("-".equals(tmpExit) && !"-".equals(targetRow.getExitTime())) {
+      targetRow.setTmpExitTime(targetRow.getExitTime()); // 既に打刻済みの退勤時間があればそれをキープ
+    } else {
+      targetRow.setTmpExitTime(tmpExit); // 入力された値（新しい時間、またはハイフン）をそのままセット
+    }
+
+    // 3. 各種ステータスを「申請中」にセット
+    targetRow.setIsTimechangeDemand(1); // 時刻修正申請中フラグを「1:申請中」
+    targetRow.setTimechangeStatus(0); // ステータスを「0:未承認」
+    targetRow.setReason(reason); // 理由を格納
+    targetRow.setAdminComment(""); // 過去の管理者コメントをクリア
+
+    // 4. データベースへ保存
     calendarRepository.save(targetRow);
-    logger.info("=== [Service] DBへの申請ステータス書き込みが正常完了しました ===");
+    System.out.println("=== [Service] DBへの申請ステータス書き込みが正常完了しました ===");
+  }
+
+  /**
+   * ユーザー自身による編集申請の取り消し処理
+   */
+  @Transactional
+  public void cancelTimeChangeRequest(String accountId, LocalDate recordDate) {
+    Optional<EntryExitCalendar> opt = calendarRepository.findByRegistedAccountIdAndRecordDate(accountId, recordDate);
+
+    if (opt.isPresent()) {
+      EntryExitCalendar record = opt.get();
+      // 申請中（未承認）の場合のみ取り消しを許可する安全ガード
+      if (record.getIsTimechangeDemand() == 1 && record.getTimechangeStatus() == 0) {
+        record.setIsTimechangeDemand(0); // フラグを通常に戻す
+        record.setTmpEntryTime(null); // 申請中だった仮時刻をクリア
+        record.setTmpExitTime(null);
+        record.setReason(null);
+
+        calendarRepository.save(record);
+        logger.info("=== [Service] ユーザーにより申請が取り消されました ===");
+      }
+    }
   }
 }

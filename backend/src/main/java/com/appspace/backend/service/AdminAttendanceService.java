@@ -1,14 +1,19 @@
 package com.appspace.backend.service;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.appspace.backend.dto.AttendanceRequestDTO;
 import com.appspace.backend.entity.EntryExitCalendar;
+import com.appspace.backend.entity.UserAccount;
 import com.appspace.backend.repository.EntryExitCalendarRepository;
+import com.appspace.backend.repository.UserAccountRepository;
 
 @Service
 @Transactional
@@ -20,11 +25,43 @@ public class AdminAttendanceService {
   @Autowired
   private EntryExitCalendarRepository calendarRepository;
 
+  @Autowired
+  private UserAccountRepository userAccountRepository;
+
   /**
-   * 管理者ロジック1: 現在申請が届いているレコードを全件取得する
+   * 管理者ロジック1: 現在申請が届いているレコードに「ユーザー名」を結合して取得する
    */
-  public List<EntryExitCalendar> getPendingTimechangeRequests() {
-    return calendarRepository.findByIsTimechangeDemandOrderByRecordDateAsc(1); // 「1：申請中」のものを利口に全件取得
+  public List<AttendanceRequestDTO> getPendingTimechangeRequestsWithUserName() {
+    List<EntryExitCalendar> rawList = calendarRepository.findByIsTimechangeDemandOrderByRecordDateAsc(1);
+
+    return rawList.stream().map(record -> {
+      AttendanceRequestDTO dto = new AttendanceRequestDTO();
+      dto.setRecordId(record.getRecordId());
+      dto.setAccountId(record.getRegistedAccountId());
+      dto.setRecordDate(record.getRecordDate());
+      dto.setEntryTime(record.getEntryTime());
+      dto.setExitTime(record.getExitTime());
+      dto.setTmpEntryTime(record.getTmpEntryTime());
+      dto.setTmpExitTime(record.getTmpExitTime());
+      dto.setReason(record.getReason());
+      dto.setAdminComment(record.getAdminComment());
+
+      String name = "不明なユーザー";
+      try {
+        Optional<UserAccount> account = userAccountRepository.findByAccountId(record.getRegistedAccountId());
+
+        if (account.isPresent()) {
+          name = account.get().getUserName();
+        } else {
+          name = "社員 (" + record.getRegistedAccountId() + ")";
+        }
+      } catch (Exception e) {
+        // アカウントが見つからない場合のセーフティ
+      }
+      dto.setUserName(name);
+
+      return dto;
+    }).collect(Collectors.toList());
   }
 
   /**

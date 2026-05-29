@@ -239,7 +239,7 @@ public class AdminAttendanceController {
 ```html
 <template>
   <div class="admin-approval-container">
-    <h2>勤怠・打刻修正承認パネル (管理者専用)</h2>
+    <h2>勤怠・打刻修正承認パネル</h2>
     <p class="subtitle">全国の従業員から提出された「打刻内容の修正申請」の一覧確認と、承認・差戻し処理が行えます。</p>
 
     <div v-if="pendingRequests.length === 0" class="no-data-alert">

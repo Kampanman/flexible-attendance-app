@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.appspace.backend.entity.EntryExitCalendar;
 import com.appspace.backend.service.AdminAttendanceService;
 
 @RestController
@@ -28,8 +27,9 @@ public class AdminAttendanceController {
    * GET http://localhost:8080/api/admin/attendance/requests
    */
   @GetMapping("/requests")
-  public ResponseEntity<List<EntryExitCalendar>> getPendingRequests() {
-    return ResponseEntity.ok(adminService.getPendingTimechangeRequests());
+  public ResponseEntity<List<com.appspace.backend.dto.AttendanceRequestDTO>> getPendingRequests() {
+    // ユーザー名が紐付いた新しいサービスロジックを呼び出す
+    return ResponseEntity.ok(adminService.getPendingTimechangeRequestsWithUserName());
   }
 
   /**

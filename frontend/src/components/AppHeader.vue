@@ -13,7 +13,7 @@
     <transition name="slide">
       <nav v-if="isMenuOpen" class="nav-menu">
         <div class="menu-user-info">
-          <p class="user-name">👤 {{ loginUserName }} さん</p>
+          <p class="user-name">{{ loginUserName }} さん</p>
           <span v-if="userRole === 1" class="badge-admin">管理者</span>
         </div>
 

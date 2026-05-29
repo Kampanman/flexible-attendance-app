@@ -13,6 +13,12 @@
         アカウント一覧・退会管理
       </button>
       <button 
+        @click="currentTab = 'requests'" 
+        :class="['tab-btn', { active: currentTab === 'requests' }]"
+      >
+        打刻申請確認
+      </button>
+      <button 
         :class="['tab-btn', { active: currentTab === 'mode' }]" 
         @click="currentTab = 'mode'"
       >
@@ -23,6 +29,10 @@
       
       <div v-if="currentTab === 'users'">
         <AdminUserList />
+      </div>
+
+      <div v-if="currentTab === 'requests'">
+        <AdminAttendanceApprovalView />
       </div>
 
       <div v-if="currentTab === 'mode'" class="mode-control-box">
@@ -73,7 +83,8 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '../api';
-// Step1で作成したコンポーネントをインポート
+// コンポーネントをインポート
+import AdminAttendanceApprovalView from '../components/AdminAttendanceApprovalView.vue';
 import AdminUserList from '../components/AdminUserList.vue';
 
 const router = useRouter();
