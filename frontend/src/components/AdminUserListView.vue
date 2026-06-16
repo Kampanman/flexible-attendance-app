@@ -18,6 +18,12 @@
       >
         打刻申請確認
       </button>
+      <button
+        @click="currentTab = 'adminPlans'"
+        :class="['tab-btn', { active: currentTab === 'adminPlans' }]"
+      >
+        予定申請確認
+      </button>
       <button 
         :class="['tab-btn', { active: currentTab === 'mode' }]" 
         @click="currentTab = 'mode'"
@@ -39,6 +45,10 @@
 
       <div v-if="currentTab === 'requests'">
         <AdminAttendanceApprovalView />
+      </div>
+
+      <div v-if="currentTab === 'adminPlans'">
+        <AdminFuturePlanPanel />
       </div>
 
       <div v-if="currentTab === 'mode'" class="mode-control-box">
@@ -97,6 +107,7 @@ import apiClient from '../api';
 import AdminAnnouncementPanel from '../components/AdminAnnouncementPanel.vue';
 import AdminAttendanceApprovalView from '../components/AdminAttendanceApprovalView.vue';
 import AdminUserList from '../components/AdminUserList.vue';
+import AdminFuturePlanPanel from './AdminFuturePlanPanel.vue';
 
 const router = useRouter();
 

@@ -178,6 +178,22 @@ public class UserAccountService {
     }
 
     /**
+     * 統括管理者ロジック: 指定されたユーザーの権限(Role)を更新する
+     */
+    public void updateUserRole(String targetAccountId, String newRole) {
+        UserAccount account = repository.findById(targetAccountId)
+                .orElseThrow(() -> new RuntimeException("指定されたユーザーが見つかりません。ID: " + targetAccountId));
+
+        // 権限フィールドに新しい値をセット (例: "ADMIN" => isAuth:1, "USER" => isAuth:0)
+        int newIsAuth = newRole.equals("ADMIN") ? 1 : 0;
+        account.setIsAuth(newIsAuth);
+
+        repository.save(account);
+        logger.info(
+                "=== [Service] ユーザー権限を更新しました (ID: " + targetAccountId + ", isAuth: " + account.getIsAuth() + ") ===");
+    }
+
+    /**
      * 退会申請（アカウント削除申請）の処理
      * 
      * @param accountId 対象のアカウントID

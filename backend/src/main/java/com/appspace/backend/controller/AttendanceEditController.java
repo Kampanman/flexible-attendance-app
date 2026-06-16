@@ -53,23 +53,39 @@ public class AttendanceEditController {
    */
   @PostMapping("/request-edit")
   public ResponseEntity<String> requestEdit(@RequestBody com.appspace.backend.dto.TimeChangeRequest request) {
-    // 【二重バリデーション】仕様書要件に基づくバックエンドチェック
 
     // 1. 備考（修正理由）の空っぽチェック
     if (request.getReason() == null || request.getReason().trim().isEmpty()) {
       return ResponseEntity.badRequest().body("【却下】修正理由（備考）の入力は必須です。");
     }
 
-    // 2. 日付判定の準備（今日の日付を取得）
+    // 2. 日付判定の準備
     java.time.LocalDate today = java.time.LocalDate.now();
     java.time.LocalDate targetDate = request.getRecordDate();
     boolean isToday = targetDate.equals(today);
+
+    // =================================================================
+    // 【新規追加：期間統制の二重防壁】
+    // =================================================================
+    if (!isToday) {
+      // 制限1: 操作日当日以外の場合、申請ができるのは「当日の1ヶ月前」の同日まで
+      java.time.LocalDate oneMonthAgo = today.minusMonths(1);
+      if (targetDate.isBefore(oneMonthAgo)) {
+        return ResponseEntity.badRequest().body("【却下】過去の打刻内容編集申請は、1ヶ月前のシステム許容期間内の日付に限られます。");
+      }
+
+      // 制限2: 安全策として、表示上限である「3ヶ月後」を超える未来の申請もブロック
+      java.time.LocalDate threeMonthsLater = today.plusMonths(3);
+      if (targetDate.isAfter(threeMonthsLater)) {
+        return ResponseEntity.badRequest().body("【却下】未来すぎる日付への申請は受け付けられません。");
+      }
+    }
+    // =================================================================
 
     // 3. 時刻形式チェック用の正規表現 (hh:mm:ss)
     String timeRegex = "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$";
 
     // --- Entry（出勤）時刻のチェック ---
-    // 当日・過去問わず、Entry時刻は必須とします（未入力・空欄・ハイフンは不可）
     if (request.getTargetEntryTime() == null ||
         request.getTargetEntryTime().equals("-") ||
         request.getTargetEntryTime().trim().isEmpty()) {
@@ -81,19 +97,17 @@ public class AttendanceEditController {
 
     // --- Exit（退勤）時刻のチェック ---
     String exitTime = request.getTargetExitTime();
-
-    // 入力値が空欄、もしくはフロントからハイフン「-」で送られてきた場合、扱いやすいように「-」に統一します
     if (exitTime == null || exitTime.trim().isEmpty()) {
       exitTime = "-";
     }
 
     if (isToday) {
-      // 当日の場合: 退勤時刻が「-」であっても許容（出勤中につき退勤打刻がまだ無いため）
+      // 当日の場合: 退勤時刻が「-」であっても許容
       if (!exitTime.equals("-") && !exitTime.matches(timeRegex)) {
         return ResponseEntity.badRequest().body("【却下】当日の退勤時刻(Exit)の形式が不正です。");
       }
     } else {
-      // 前日以前（過去）の場合: 退勤時刻「-」は不可。必ず有効な時刻形式が必要
+      // 前日以前（過去）の場合: 退勤時刻「-」は不可
       if (exitTime.equals("-")) {
         return ResponseEntity.badRequest().body("【却下】過去の日付の申請には、退勤時刻(Exit)の入力も必須です。");
       }
@@ -103,15 +117,14 @@ public class AttendanceEditController {
     }
 
     try {
-      // 統一した変数（exitTime）をサービス層に手渡すように修正
       calendarService.requestTimeChange(
           request.getAccountId(),
           request.getRecordDate(),
           request.getTargetEntryTime(),
-          exitTime, // 「-」または正しい時刻文字列
+          exitTime,
           request.getReason());
 
-      System.out.println("=== [Controller] 修正申請の受付に成功しました ===");
+      logger.info("=== [Controller] 期間統制チェックを通過し、修正申請を受付完了 ===");
       return ResponseEntity.ok("打刻内容の修正申請を提出しました。管理者の承認をお待ちください。");
 
     } catch (Exception e) {

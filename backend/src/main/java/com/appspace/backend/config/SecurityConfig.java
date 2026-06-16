@@ -37,12 +37,15 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/h2-console/**",
                                 "/api/users/**",
+                                "/api/users/admin/**",
                                 "/api/system/**",
                                 "/api/attendance/**",
                                 "/api/attendance/history/**",
                                 "/api/admin/attendance/**",
                                 "/api/admin/announcements/**",
-                                "/api/dashboard/**")
+                                "/api/admin/plans/**",
+                                "/api/dashboard/**",
+                                "/api/plans/**")
                         .permitAll()
                         .anyRequest().authenticated());
         return http.build();

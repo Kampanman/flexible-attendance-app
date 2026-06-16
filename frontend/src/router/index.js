@@ -5,6 +5,7 @@ import AdminUserListView from '../components/AdminUserListView.vue';
 import AttendanceBoard from '../components/AttendanceBoard.vue';
 import AttendanceEdit from '../components/AttendanceEditView.vue';
 import DashboardView from '../components/DashboardView.vue';
+import FuturePlan from '../components/FuturePlanView.vue';
 import LoginForm from '../components/LoginForm.vue';
 import RegistForm from '../components/RegisterForm.vue';
 
@@ -14,6 +15,7 @@ const routes = [
   { path: '/attendance', component: AttendanceBoard },
   { path: '/attendance-edit', component: AttendanceEdit },
   { path: '/dashboard', component: DashboardView },
+  { path: '/schedule-request', component: FuturePlan },
   { path: '/account-edit', component: AccountEdit },
   { path: '/admin', component: AdminUserListView },
   { path: '/admin/approval', component: AdminAttendanceApproval },

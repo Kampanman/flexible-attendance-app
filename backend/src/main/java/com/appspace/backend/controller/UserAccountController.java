@@ -1,6 +1,7 @@
 package com.appspace.backend.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -134,6 +135,34 @@ public class UserAccountController {
         // サービス層から全ユーザーを取得して返却
         List<UserAccount> users = userService.findAll();
         return ResponseEntity.ok(users);
+    }
+
+    /**
+     * 管理者用: 統括管理者からのユーザー権限変更リクエストの受付
+     * POST http://localhost:8080/api/users/admin/update-role
+     */
+    @PostMapping("/admin/update-role")
+    public ResponseEntity<String> changeUserRole(@RequestBody Map<String, Object> payload) {
+        String loginAccountId = (String) payload.get("loginAccountId"); // 操作している本人のID
+        String targetAccountId = (String) payload.get("targetAccountId"); // 変更対象のユーザーID
+        String newRole = (String) payload.get("newRole"); // 新しい権限文字列
+
+        // バリデーション
+        if (targetAccountId == null || newRole == null) {
+            return ResponseEntity.badRequest().body("【却下】必要なパラメータが不足しています。");
+        }
+
+        // 【最重要安全ガード】変更対象が自分自身である場合は、バックエンド側でも絶対に拒否する
+        if (targetAccountId.equals(loginAccountId)) {
+            return ResponseEntity.badRequest().body("【システム保護】自分自身の管理権限を変更することはできません。");
+        }
+
+        try {
+            userService.updateUserRole(targetAccountId, newRole);
+            return ResponseEntity.ok("ユーザーの権限を正常に更新しました。");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("権限更新中にエラーが発生しました: " + e.getMessage());
+        }
     }
 
     /**

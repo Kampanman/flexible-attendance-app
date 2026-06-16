@@ -30,7 +30,7 @@
     <section class="menu-section">
       <h2>各種メニュー</h2>
       <div class="menu-grid">
-        <button @click="navigateTo('/schedule-demand')" class="btn-menu">
+        <button @click="navigateTo('/schedule-request')" class="btn-menu">
           予定申請
         </button>
         <button @click="navigateTo('/attendance-edit')" class="btn-menu">

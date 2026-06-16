@@ -32,8 +32,8 @@
 
 <script setup>
 import { ref } from 'vue';
-import apiClient from '../api';
 import { useRouter } from 'vue-router'; // ★重要: ルーターをインポート
+import apiClient from '../api';
 
 const router = useRouter(); // ★重要: ルーターオブジェクトを取得
 
@@ -70,11 +70,27 @@ const handleLogin = async () => {
     // 1. ローカルストレージ等に、バックエンドから返ってきたユーザー情報を保存する（後で認証ガードに使うため）
     // ※ response.data の構造（accountId や userName が入っているか）に合わせて調整してください
     localStorage.setItem('user', JSON.stringify(response.data));
+
+    // ログイン成功の瞬間に、過去予定を自動消去する
+    const syncLoginPastPlans = async (accountId) => {
+      try {
+        // バックエンドのログイン時クリーンアップAPIを呼び出す
+        await apiClient.post('/plans/sync-login', { accountId: accountId });
+        console.log('=== [Login Sync] 過去の予定データの自動リフレッシュが完了しました ===');
+      } catch (error) {
+        console.error('ログイン時の予定同期エラー:', error);
+      }
+    };
+
+    // ログイン成功時にアカウントIDを渡して実行
+    if (response.data.accountId) {
+      await syncLoginPastPlans(response.data.accountId);
+    }
     
     // 2. 親へのemit（もし動かなくても保険として残す、不要なら消してもOK）
     emit('login-success', response.data); 
     
-    // 3. ★ここで直接、新設したダッシュボード画面へジャンプさせる！
+    // 3. ここで直接、新設したダッシュボード画面へジャンプさせる！
     router.push('/dashboard'); 
     
   } catch (error) {

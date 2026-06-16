@@ -1,3 +1,113 @@
+---
+marp: true
+style: |
+  section.frontpage h1 {
+    text-align: center;
+  }
+  section p, section li {
+    font-size: 24px;
+  }
+---
+<!-- _class: frontpage -->
+# 統括管理者による登録ユーザーの権限変更機能
+
+今回の要件における最大のポイントは、「自身（ログイン中の統括管理者）の権限変更はブロックする」という安全ガード（セーフティ）の設計です。
+
+自身の権限をうっかり一般ユーザーに変えてしまうと、システムを管理できる人が誰もいなくなってしまう「詰み」の状態が起きてしまうため、実務システムでも絶対に外せない鉄則の防壁です。
+
+この機能をスマートに実現するための**バックエンド（Java）およびフロントエンド（Vue.js）の修正・追加内容**について提示します。
+
+---
+
+## 1. 権限変更のデータトラフィックと安全ガードの考察
+
+権限変更のトラフィックは次のように組み立てます。
+
+```text
+【フロントエンド】
+1. ログインユーザーが「統括管理者」のときだけ、アカウント一覧テーブルに「権限変更用のセレクトボックス」を出現させる。
+2. ただし、その行の accountId が自分自身の ID と一致する場合は、セレクトボックスを非活性（disabled）にして操作不能にする。
+
+【バックエンド】
+3. フロントから「対象者のID」と「新しい権限名（Role）」が届く。
+4. 安全の二重防壁として、リクエストを出した本人（ログインユーザー）のIDと対象者のIDが同じなら「却下（400 Bad Request）」を返す。
+5. 問題なければ、対象ユーザーの権限カラムを上書き保存する。
+```
+
+今回は、アカウント情報を司る既存の **`UserAccount.java`（Entity）** にすでに権限を管理するフィールド（例：`role` や `authority` など）が存在している想定で、コントローラーとサービスを構築します。
+
+---
+
+## 2. バックエンド（Java）側の修正コード
+
+### ① Service層へのメソッド追加：`UserAccountService.java`
+
+指定されたユーザーの権限を安全に上書きするメソッドを追加します。
+
+```java
+    /**
+     * 統括管理者ロジック: 指定されたユーザーの権限(Role)を更新する
+     */
+    public void updateUserRole(String targetAccountId, String newRole) {
+        UserAccount account = repository.findById(targetAccountId)
+                .orElseThrow(() -> new RuntimeException("指定されたユーザーが見つかりません。ID: " + targetAccountId));
+
+        // 権限フィールドに新しい値をセット (例: "ADMIN" => isAuth:1, "USER" => isAuth:0)
+        int newIsAuth = newRole.equals("ADMIN") ? 1 : 0;
+        account.setIsAuth(newIsAuth);
+
+        repository.save(account);
+        logger.info(
+                "=== [Service] ユーザー権限を更新しました (ID: " + targetAccountId + ", isAuth: " + account.getIsAuth() + ") ===");
+    }
+```
+
+#### ② Controller層へのエンドポイント追加：`UserAccountController.java`
+
+リクエスト元のIDと変更対象のIDを比較するセーフティガードを敷いた受付窓口を新設します。
+
+---
+
+```java
+    /**
+     * 管理者用: 統括管理者からのユーザー権限変更リクエストの受付
+     * POST http://localhost:8080/api/users/admin/update-role
+     */
+    @PostMapping("/admin/update-role")
+    public ResponseEntity<String> changeUserRole(@RequestBody Map<String, Object> payload) {
+        String loginAccountId = (String) payload.get("loginAccountId"); // 操作している本人のID
+        String targetAccountId = (String) payload.get("targetAccountId"); // 変更対象のユーザーID
+        String newRole = (String) payload.get("newRole"); // 新しい権限文字列
+
+        // バリデーション
+        if (targetAccountId == null || newRole == null) {
+            return ResponseEntity.badRequest().body("【却下】必要なパラメータが不足しています。");
+        }
+
+        // 【最重要安全ガード】変更対象が自分自身である場合は、バックエンド側でも絶対に拒否する
+        if (targetAccountId.equals(loginAccountId)) {
+            return ResponseEntity.badRequest().body("【システム保護】自分自身の管理権限を変更することはできません。");
+        }
+
+        try {
+            userService.updateUserRole(targetAccountId, newRole);
+            return ResponseEntity.ok("ユーザーの権限を正常に更新しました。");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("権限更新中にエラーが発生しました: " + e.getMessage());
+        }
+    }
+```
+
+---
+
+## 3. フロントエンド（Vue.js）側の修正コード
+
+既存の「アカウント一覧・退会管理」タブを表示する `AdminUserList.vue` を修正します。
+変更箇所が広範囲に及ぶ為、今回はソースコードのうち `<template>` と `<script>` の全体を掲載します。
+
+### ① `<template>` 側
+
+```html
 <template>
   <div class="admin-sub-container">
     <div class="control-panel">
@@ -10,6 +120,11 @@
           placeholder="名前やIDで検索（半角スペース区切りで複数ワード検索対応）" 
           class="input-search"
         />
+```
+
+---
+
+```html
       </div>
 
       <div class="per-page-box">
@@ -46,6 +161,11 @@
             <th>退会申請</th>
           </tr>
         </thead>
+```
+
+---
+
+```html
         <tbody>
           <tr v-for="user in paginatedUsers" :key="user.accountId" :class="{ 'row-quit-pending': user.quitDemand === 1 }">
             <td><strong>{{ user.userName }}</strong></td>
@@ -87,6 +207,11 @@
               </select>
             </td>
 
+```
+
+---
+
+```html
             <td>
               <button 
                 v-if="user.quitDemand === 1 && user.userId !== 'admin@example.com'" 
@@ -126,6 +251,13 @@
     </div>
   </div>
 </template>
+```
+
+---
+
+### ② `<script setup>` 側：変数設定とAPI送信関数の追加
+
+```javascript
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import apiClient from '../api';
@@ -156,6 +288,11 @@ const fetchUserList = async () => {
   }
 };
 
+```
+
+---
+
+```javascript
 onMounted(() => {
   // ローカルストレージなどから、現在ログインしているユーザーの情報をロードして変数にセット
   const userData = localStorage.getItem('user');
@@ -198,6 +335,11 @@ const endIndex = computed(() => {
   const end = startIndex.value + perPage.value;
   return end > filteredAndSortedUsers.value.length ? filteredAndSortedUsers.value.length : end;
 });
+```
+
+---
+
+```javascript
 const paginatedUsers = computed(() => filteredAndSortedUsers.value.slice(startIndex.value, endIndex.value));
 
 watch([searchQuery, perPage], () => { currentPage.value = 1; });
@@ -230,6 +372,11 @@ const handleApproveQuit = async (targetUser) => {
 // 状態管理変数
 const currentLoginUserId = ref('');   // ログイン中の自分のアカウントID
 
+```
+
+---
+
+```javascript
 // ロール表記を日本語に変換する補助関数
 const formatRoleLabel = (roleStr) => {
   if (roleStr === 'SUPER_ADMIN') return '統括管理者';
@@ -262,81 +409,21 @@ const handleRoleChange = async (targetAccountId, newRole) => {
   }
 };
 </script>
+```
 
-<style scoped>
-/* スタイルは前回同様（親から切り離したため幅いっぱいに広がるよう調整） */
-.control-panel { 
-  display: flex; 
-  gap: 20px; 
-  background: #ffffff; 
-  padding: 15px 20px; 
-  border-radius: 8px; 
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05); 
-  margin-bottom: 15px; 
-  align-items: flex-end;
-}
-.search-box { flex: 1; }
-.per-page-box { width: 120px; }
-.control-label { display: block; font-size: 0.85rem; font-weight: bold; color: #495057; margin-bottom: 5px; }
-.input-search, .select-per-page {
-  width: 100%; 
-  padding: 8px 12px; 
-  border: 1px solid #ced4da; 
-  border-radius: 4px; 
-  font-size: 0.9rem; 
-  box-sizing: border-box;
-}
-.sortable-header { cursor: pointer; user-select: none; }
-.sortable-header:hover { background-color: #e9ecef !important; }
-.table-responsive { background: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
-.user-table { width: 100%; border-collapse: collapse; text-align: left; }
-.user-table th, .user-table td { padding: 15px 20px; border-bottom: 1px solid #dee2e6; }
-.user-table th { background-color: #f8f9fa; color: #495057; font-weight: bold; }
-.row-quit-pending { background-color: #fffdf5; }
-.badge { display: inline-block; padding: 5px 10px; font-size: 0.8rem; font-weight: bold; border-radius: 20px; }
-.badge-admin { background-color: #e3f2fd; color: #0d47a1; }
-.badge-general { background-color: #e8f5e9; color: #1b5e20; }
-.badge-normal { background-color: #f1f3f5; color: #6c757d; }
-.badge-warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-.animate-pulse { animation: pulse 2s infinite; }
-.btn-approve { 
-  background-color: #dc3545; 
-  color: white; 
-  border: none; 
-  padding: 8px 14px; 
-  border-radius: 4px; 
-  font-size: 0.85rem; 
-  font-weight: bold; 
-  cursor: pointer;
-}
-.btn-approve:hover { background-color: #bd2130; }
-.text-muted { color: #ced4da; }
-.text-muted-info { color: #adb5bd; font-size: 0.85rem; font-style: italic; }
-.pagination-panel { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  margin-top: 20px; 
-  background: #ffffff; 
-  padding: 12px 20px; 
-  border-radius: 8px; 
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
-.pagination-info { font-size: 0.9rem; color: #495057; }
-.pagination-buttons { display: flex; gap: 5px; }
-.btn-page, .btn-page-number { 
-  padding: 6px 12px; 
-  background-color: #ffffff; 
-  border: 1px solid #ced4da; 
-  border-radius: 4px; 
-  font-size: 0.85rem; 
-  cursor: pointer;
-}
-.btn-page:disabled { color: #ced4da; cursor: not-allowed; }
-.btn-page-number.active { background-color: #007bff; color: white; border-color: #007bff; font-weight: bold; }
-.alert { padding: 15px; margin-bottom: 20px; border-radius: 4px; font-weight: bold; }
-.alert-danger { background-color: #f8d7da; color: #721c24; border-left: 5px solid #dc3545; }
-.alert-success { background-color: #d4edda; color: #155724; border-left: 5px solid #28a745; }
-.empty-box { text-align: center; padding: 40px; color: #6c757d; }
-</style>
+---
+
+## 連動の確認とデバッグポイント
+
+修正ファイルをそれぞれ配置し、Spring Bootの再起動を行ったあと、以下のステップで動作を確かめてみてください。
+
+* **統括管理者でログインしたとき:**
+
+  * 自分自身の行にはセレクトボックスが出現せず、代わりに「(あなた)」というバッジが点灯することを確認します（安全ガードの作動）。
+  * 自分以外の従業員の行にはセレクトボックスが表示され、試しに「一般ユーザー」から「管理者」へ切り替えた際、確認アラートを経て「正常に更新しました」と表示されれば成功です！
+
+* **一般の管理者やユーザーでログインしたとき:**
+
+  * 他のすべてのユーザーの行も含めて、セレクトボックスが一切出現せず、すべて通常のテキスト表示（編集不可）になっていれば完璧です。
+
+これで、統括管理者だけに許された強力なコマンドでありながら、システムを崩壊させないための安全機構がマウントされました！
